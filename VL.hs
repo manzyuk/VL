@@ -2,6 +2,9 @@ module VL where
 
 import Data.Maybe (fromMaybe)
 
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -21,6 +24,9 @@ lookupVariable x env
 extendBindings :: Name -> val -> Environment val -> Environment val
 extendBindings x v env = (x, v) : env
 
+restrictDomain :: Set Name -> Environment val -> Environment val
+restrictDomain set env = [(x, v) | (x, v) <- env, x `Set.member` set]
+
 -- Expressions
 
 data Expression
@@ -29,6 +35,14 @@ data Expression
     | Application Expression Expression
     | Cons Expression Expression
       deriving (Eq, Ord, Show)
+
+freeVariables :: Expression -> Set Name
+freeVariables (Variable x) = Set.singleton x
+freeVariables (Lambda x e) = Set.delete x (freeVariables e)
+freeVariables (Application e1 e2)
+    = (freeVariables e1) `Set.union` (freeVariables e2)
+freeVariables (Cons e1 e2)
+    = (freeVariables e1) `Set.union` (freeVariables e2)
 
 -- Concrete values
 
@@ -51,7 +65,9 @@ type ConcreteEnvironment = Environment ConcreteValue
 
 eval :: Expression -> ConcreteEnvironment -> ConcreteValue
 eval (Variable x)        env = lookupVariable x env
-eval (Lambda x e)        env = ConcreteClosure env x e
+eval e@(Lambda x b)      env = ConcreteClosure env' x b
+    where
+      env' = restrictDomain (freeVariables e) env
 eval (Application e1 e2) env = apply (eval e1 env) (eval e2 env)
 eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
 
@@ -139,7 +155,9 @@ evalBar :: Expression
         -> AbstractAnalysis
         -> AbstractValue
 evalBar (Variable x) env a = lookupVariable x env
-evalBar (Lambda x e) env a = AbstractClosure env x e
+evalBar e@(Lambda x b) env a = AbstractClosure env' x b
+    where
+      env' = restrictDomain (freeVariables e) env
 evalBar (Application e1 e2) env a
     = applyBar (evalBar1 e1 env a) (evalBar1 e2 env a) a
 evalBar (Cons e1 e2) env a
