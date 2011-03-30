@@ -3,92 +3,76 @@ module VL.AbstractEvaluator where
 import VL.Common
 import VL.Scalar
 import VL.Expression
-import VL.Environment
+
+import VL.Environment (Environment)
+import qualified VL.Environment as Environment
+
 import VL.AbstractValue
-import VL.AbstractAnalysis
 
-import Data.Map (Map)
-import qualified Data.Map as Map
+import VL.AbstractAnalysis (AbstractAnalysis)
+import qualified VL.AbstractAnalysis as Analysis
 
-evalBar1 :: Expression
-         -> AbstractEnvironment
-         -> AbstractAnalysis
-         -> AbstractValue
-evalBar1 e env a = fromMaybe AbstractTop (Map.lookup (e, env) a)
-
-applyBar :: AbstractValue
-         -> AbstractValue
-         -> AbstractAnalysis
-         -> AbstractValue
-applyBar (AbstractClosure env x e) v a
+refineApply :: AbstractValue
+            -> AbstractValue
+            -> AbstractAnalysis
+            -> AbstractValue
+refineApply (AbstractClosure env x e) v a
     | v /= AbstractTop
-    = evalBar1 e (extendBindings x v env) a
+    = Analysis.lookup e (Environment.insert x v env) a
     | otherwise
     = AbstractTop
-applyBar AbstractTop _ _ = AbstractTop
-applyBar _ _ _ = error "Cannot apply abstract non-function"
+refineApply AbstractTop _ _ = AbstractTop
+refineApply _ _ _ = error "Cannot refine an abstract non-function"
 
-evalBar :: Expression
-        -> AbstractEnvironment
-        -> AbstractAnalysis
-        -> AbstractValue
-evalBar (Variable x) env a = lookupVariable x env
-evalBar e@(Lambda x b) env a = AbstractClosure env' x b
+refineEval :: Expression
+           -> AbstractEnvironment
+           -> AbstractAnalysis
+           -> AbstractValue
+refineEval (Variable x)   env a = Environment.lookup x env
+refineEval e@(Lambda x b) env a = AbstractClosure env' x b
     where
-      env' = restrictDomain (freeVariables e) env
-evalBar (Application e1 e2) env a
-    = applyBar (evalBar1 e1 env a) (evalBar1 e2 env a) a
-evalBar (Cons e1 e2) env a
+      env' = Environment.restrict (freeVariables e) env
+refineEval (Application e1 e2) env a
+    = refineApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
+refineEval (Cons e1 e2) env a
     | v1 /= AbstractTop && v2 /= AbstractTop
     = AbstractPair v1 v2
     | otherwise
     = AbstractTop
     where
-      v1 = evalBar1 e1 env a
-      v2 = evalBar1 e2 env a
+      v1 = Analysis.lookup e1 env a
+      v2 = Analysis.lookup e2 env a
 
-evalBar1' :: Expression
-          -> AbstractEnvironment
-          -> AbstractAnalysis
-          -> AbstractAnalysis
-evalBar1' e env a
-    | (e, env) `Map.member` a
-    = Map.singleton (e, env) AbstractTop
-    | otherwise
-    = Map.empty
-
-applyBar' :: AbstractValue
-          -> AbstractValue
-          -> AbstractAnalysis
-          -> AbstractAnalysis
-applyBar' (AbstractClosure env x e) v a
+expandApply :: AbstractValue
+            -> AbstractValue
+            -> AbstractAnalysis
+            -> AbstractAnalysis
+expandApply (AbstractClosure env x e) v a
     | v /= AbstractTop
-    = evalBar1' e (extendBindings x v env) a
+    = Analysis.expand e (Environment.insert x v env) a
     | otherwise
-    = Map.empty
-applyBar' AbstractTop _ _ = Map.empty
-applyBar' _ _ _ = error "Cannot apply abstract non-function"
+    = Analysis.empty
+expandApply AbstractTop _ _ = Analysis.empty
+expandApply _ _ _ = error "Cannot expand an abstract non-function"
 
-evalBar' :: Expression
-         -> AbstractEnvironment
-         -> AbstractAnalysis
-         -> AbstractAnalysis
-evalBar' (Variable _) _ _ = Map.empty
-evalBar' (Lambda _ _) _ _ = Map.empty
-evalBar' (Application e1 e2) env a
-    = unifyAnalyses [ evalBar1' e1 env a
-                    , evalBar1' e2 env a
-                    , applyBar' (evalBar1 e1 env a) (evalBar1 e2 env a) a
-                    ]
-evalBar' (Cons e1 e2) env a
-    = unifyAnalyses [ evalBar1' e1 env a
-                    , evalBar1' e2 env a
-                    ]
+expandEval :: Expression
+           -> AbstractEnvironment
+           -> AbstractAnalysis
+           -> AbstractAnalysis
+expandEval (Variable _) _ _ = Analysis.empty
+expandEval (Lambda _ _) _ _ = Analysis.empty
+expandEval (Application e1 e2) env a
+    = Analysis.unions [ Analysis.expand e1 env a
+                      , Analysis.expand e2 env a
+                      , expandApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
+                      ]
+expandEval (Cons e1 e2) env a
+    = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
 
 u :: AbstractAnalysis -> AbstractAnalysis
-u a = unifyAnalyses . map u1 . Map.keys $ a
+u a = Analysis.unions . map u1 . Analysis.domain $ a
     where
-      u1 (e, env) = Map.insert (e, env) (evalBar e env a) (evalBar' e env a)
+      u1 (e, env) = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
 analyze :: Expression
@@ -96,7 +80,7 @@ analyze :: Expression
         -> AbstractAnalysis
 analyze e constants = leastFixedPoint u a0
     where
-      a0 = Map.singleton (e, initialAbstractEnvironment ++ bindings) AbstractTop
+      a0 = Analysis.singleton e (initialAbstractEnvironment ++ bindings) AbstractTop
       bindings = [(x, AbstractScalar v) | (x, v) <- constants]
 
 leastFixedPoint :: Eq a => (a -> a) -> a -> a
