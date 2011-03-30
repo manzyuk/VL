@@ -107,9 +107,12 @@ unifyValues (AbstractPair v1 v2) (AbstractPair v1' v2')
 unifyValues _ _
     = AbstractTop
 
--- Abstract analysises
+-- Abstract analyses
 
 type AbstractAnalysis = Map (Expression, AbstractEnvironment) AbstractValue
+
+unifyAnalyses :: [AbstractAnalysis] -> AbstractAnalysis
+unifyAnalyses = foldl (Map.unionWith unifyValues) Map.empty
 
 -- Abstract evaluator
 
@@ -177,15 +180,17 @@ evalBar' :: Expression
 evalBar' (Variable _) _ _ = Map.empty
 evalBar' (Lambda _ _) _ _ = Map.empty
 evalBar' (Application e1 e2) env a
-    = Map.unions [ evalBar1' e1 env a
-                 , evalBar1' e2 env a
-                 , applyBar' (evalBar1 e1 env a) (evalBar1 e2 env a) a
-                 ]
+    = unifyAnalyses [ evalBar1' e1 env a
+                    , evalBar1' e2 env a
+                    , applyBar' (evalBar1 e1 env a) (evalBar1 e2 env a) a
+                    ]
 evalBar' (Cons e1 e2) env a
-    = (evalBar1' e1 env a) `Map.union` (evalBar1' e2 env a)
+    = unifyAnalyses [ evalBar1' e1 env a
+                    , evalBar1' e2 env a
+                    ]
 
 u :: AbstractAnalysis -> AbstractAnalysis
-u a = Map.unions . map u1 . Map.keys $ a
+u a = unifyAnalyses . map u1 . Map.keys $ a
     where
       u1 (e, env) = Map.insert (e, env) (evalBar e env a) (evalBar' e env a)
 
