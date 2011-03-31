@@ -28,16 +28,22 @@ scan ('+':c:cs)
     | not (isDigit c)
     = Identifier "+" : scan (c:cs)
     | otherwise
-    = (Real (read cs' :: Float) : scan cs'')
+    = Real (read cs' :: Float) : scan cs''
     where
-      (cs', cs'') = scanReal (c:cs)
+      (cs', cs'') = scanUnsignedReal (c:cs)
 scan ('-':c:cs)
     | not (isDigit c)
     = Identifier "-" : scan (c:cs)
     | otherwise
-    = (Real (negate (read cs' :: Float)) : scan cs'')
+    = Real (negate (read cs' :: Float)) : scan cs''
     where
-      (cs', cs'') = scanReal (c:cs)
+      (cs', cs'') = scanUnsignedReal (c:cs)
+
+scan s@(c:cs)
+    | isDigit c
+    = Real (read cs' :: Float) : scan cs''
+    where
+      (cs', cs'') = scanUnsignedReal s
 
 scan ('#':'t':cs) = Boolean True  : scan cs
 scan ('#':'f':cs) = Boolean False : scan cs
@@ -64,8 +70,8 @@ isSubsequent c = isInitial c || isDigit c || isSpecialSubsequent c
 isSpecialSubsequent :: Char -> Bool
 isSpecialSubsequent c = c `elem` "+-.@"
 
-scanReal :: String -> (String, String)
-scanReal cs = (integralPart ++ fractionalPart, cs'')
+scanUnsignedReal :: String -> (String, String)
+scanUnsignedReal cs = (integralPart ++ fractionalPart, cs'')
     where
       (integralPart,   cs' ) = scanIntegralPart   cs
       (fractionalPart, cs'') = scanFractionalPart cs'
