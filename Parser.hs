@@ -77,14 +77,10 @@ emptyList = Nil <$ (literate Token.Quote >> literate Token.LParen >> literate To
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)
 
-lambda :: Parser Expression
-lambda = liftA2 Lambda (keyword "lambda" *> parens identifier) expression
-
-application :: Parser Expression
-application = liftA2 Application expression expression
-
-cons :: Parser Expression
-cons = liftA2 Cons (keyword "cons" *> expression) expression
+lambda, application, cons :: Parser Expression
+lambda      = liftA2 Lambda      (keyword "lambda" *> parens identifier) expression
+application = liftA2 Application expression                              expression
+cons        = liftA2 Cons        (keyword "cons"   *> expression)        expression
 
 expression :: Parser Expression
 expression = atom <|> list
