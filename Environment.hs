@@ -9,6 +9,12 @@ import qualified Data.Set as Set
 
 type Environment val = [(Name, val)]
 
+empty :: Environment val
+empty = []
+
+union :: Eq val => Environment val -> Environment val -> Environment val
+union = List.union
+
 domain :: Environment val -> [Name]
 domain env = [x | (x, v) <- env]
 
