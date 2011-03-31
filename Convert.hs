@@ -6,6 +6,9 @@ import VL.Scalar
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
 
+-- I dont' know what's worse: to have almost identical definitions of
+-- data types in separate modules and `import qualified' them or
+-- prepend all type and constructor names with some prefix.
 import qualified VL.Expression  as Core
 import qualified VL.Parser      as Parser
 
