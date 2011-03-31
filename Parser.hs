@@ -59,7 +59,7 @@ variable :: Parser Expression
 variable = Variable <$> identifier
 
 keywords :: [String]
-keywords = ["lambda", "cons"]
+keywords = ["lambda", "cons", "list"]
 
 -- @constant@ is a parser that succeeds if the next token is a
 -- constant (i.e., nil, #t, #f, or a real) and returns it
@@ -77,16 +77,17 @@ emptyList = Nil <$ (literate Token.Quote >> literate Token.LParen >> literate To
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)
 
-lambda, application, cons :: Parser Expression
+lambda, application, cons, list :: Parser Expression
 lambda      = liftA2 Lambda      (keyword "lambda" *> parens identifier) expression
 application = liftA2 Application expression                              expression
 cons        = liftA2 Cons        (keyword "cons"   *> expression)        expression
+list        = foldr Cons (Constant Nil) <$> (keyword "list" *> many expression)
 
 expression :: Parser Expression
-expression = atom <|> list
+expression = atom <|> form
     where
       atom = variable <|> constant
-      list = parens (try lambda <|> try cons <|> application)
+      form = parens (try lambda <|> try cons <|> try list <|> application)
 
 parseExpression :: String -> Expression
 parseExpression = either (\_ -> error "parse error") id
