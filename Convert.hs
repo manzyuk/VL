@@ -23,7 +23,7 @@ convert' (Parser.Variable x)
     = return (Environment.empty, Core.Variable x)
 convert' (Parser.Constant s)
     = do c <- makeGensym "const"
-         return (Environment.insert c s Environment.empty, Core.Variable c)
+         return (Environment.singleton c s, Core.Variable c)
 convert' (Parser.Lambda x b)
     = do (env, b') <- convert' b
          return (env, Core.Lambda x b')

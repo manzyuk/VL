@@ -27,3 +27,6 @@ insert x v env = (x, v) : env
 
 restrict :: Set Name -> Environment val -> Environment val
 restrict set env = [(x, v) | (x, v) <- env, x `Set.member` set]
+
+singleton :: Name -> val -> Environment val
+singleton x v = [(x, v)]
