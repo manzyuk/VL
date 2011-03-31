@@ -3,7 +3,7 @@ module VL.Parser where
 import VL.Common
 import VL.Scalar
 
-import VL.Token (Token)
+import VL.Token (Token, scan)
 import qualified VL.Token as Token
 
 import Text.ParserCombinators.Parsec hiding (many, optional, (<|>), Parser)
@@ -86,7 +86,13 @@ application = liftA2 Application expression expression
 cons :: Parser Expression
 cons = liftA2 Cons (keyword "cons" *> expression) expression
 
+expression :: Parser Expression
 expression = atom <|> list
     where
       atom = variable <|> constant
       list = parens (try lambda <|> try cons <|> application)
+
+parseExpression :: String -> Expression
+parseExpression = either (\_ -> error "parse error") id
+                . parse (expression <* eof) ""
+                . scan
