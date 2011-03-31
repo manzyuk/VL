@@ -81,13 +81,25 @@ lambda, application, cons, list :: Parser Expression
 lambda      = liftA2 Lambda      (keyword "lambda" *> parens identifier) expression
 application = liftA2 Application expression                              expression
 cons        = liftA2 Cons        (keyword "cons"   *> expression)        expression
-list        = foldr Cons (Constant Nil) <$> (keyword "list" *> many expression)
+
+list        = foldr Cons (Constant Nil) <$> (keyword "list"  *> many expression)
+consStar    = fold  Cons (Constant Nil) <$> (keyword "cons*" *> many expression)
+    where
+      fold :: (b -> b -> b) -> b -> [b] -> b
+      fold step x0 []     = x0
+      fold step x0 [x1]   = x1
+      fold step x0 (x:xs) = step x (fold step x0 xs)
 
 expression :: Parser Expression
 expression = atom <|> form
     where
       atom = variable <|> constant
-      form = parens (try lambda <|> try cons <|> try list <|> application)
+      form = parens $
+                 try lambda
+             <|> try cons
+             <|> try list
+             <|> try consStar
+             <|> application
 
 parseExpression :: String -> Expression
 parseExpression = either (\_ -> error "parse error") id
