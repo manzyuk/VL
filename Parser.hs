@@ -48,7 +48,7 @@ literate t = extract getLiterate
 -- identifier that is not a keyword and returns the name of that
 -- identifier, or fails otherwise.
 identifier :: Parser String
-identifier = extract getIdentifier <?> "identifier"
+identifier = extract getIdentifier
     where
       getIdentifier (Token.Identifier x)
           | x `notElem` keywords = Just x
@@ -65,7 +65,7 @@ keywords = ["lambda", "cons"]
 -- constant (i.e., nil, #t, #f, or a real) and returns it
 -- suitably wrapped, or fails otherwise.
 constant :: Parser Expression
-constant = Constant <$> (try emptyList <|> extract getConstant) <?> "constant"
+constant = Constant <$> (try emptyList <|> extract getConstant)
     where
       getConstant (Token.Boolean b) = Just (Boolean b)
       getConstant (Token.Real    r) = Just (Real    r)
