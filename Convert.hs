@@ -16,16 +16,16 @@ import Control.Monad.State
 
 type Gensym = State Int
 
-makeGensym :: String -> Gensym String
-makeGensym prefix = do i <- get
-                       put (succ i)
-                       return ("#:" ++ prefix ++ "-" ++ show i)
+mkGensym :: String -> Gensym String
+mkGensym prefix = do i <- get
+                     put (succ i)
+                     return ("#:" ++ prefix ++ "-" ++ show i)
 
 convert' :: Parser.Expression -> Gensym (Environment Scalar, Core.Expression)
 convert' (Parser.Variable x)
     = return (Environment.empty, Core.Variable x)
 convert' (Parser.Constant s)
-    = do c <- makeGensym "const"
+    = do c <- mkGensym "const"
          return (Environment.singleton c s, Core.Variable c)
 convert' (Parser.Lambda x b)
     = do (env, b') <- convert' b
