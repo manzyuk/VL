@@ -156,7 +156,20 @@ cadnr n = car . cdnr n
 
 -- Transform every lambda that takes possibly many arguments into a
 -- combination of lambdas that take only one argument, introducing
--- suitable argument destructuring.
+-- suitable argument destructuring.  In particular:
+--
+-- (lambda () e)
+-- ~> (lambda (#:ignored) e)
+--
+-- and
+--
+-- (lambda (x1 x2) e)
+-- ~> (lambda (#:args)
+--      ((lambda (x1)
+--         ((lambda (x2)
+--            e)
+--          (car (cdr #:args))))
+--       (car #:args)))
 transform :: SurfaceExpression -> CoreExpression
 transform (Lambda []  b) = Lambda "#:ignored" (transform b)
 transform (Lambda [x] b) = Lambda x (transform b)
