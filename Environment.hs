@@ -25,8 +25,14 @@ lookup x env
 insert :: Name -> val -> Environment val -> Environment val
 insert x v env = (x, v) : env
 
+update :: Name -> val -> Environment val -> Environment val
+update x v env = maybe (insert x v env) (const env) (List.lookup x env)
+
 restrict :: Set Name -> Environment val -> Environment val
 restrict set env = [(x, v) | (x, v) <- env, x `Set.member` set]
+
+fromList :: [(Name, val)] -> Environment val
+fromList = id
 
 singleton :: Name -> val -> Environment val
 singleton x v = [(x, v)]
