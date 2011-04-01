@@ -59,7 +59,7 @@ variable :: Parser Expression
 variable = Variable <$> identifier
 
 keywords :: [String]
-keywords = ["lambda", "cons", "list"]
+keywords = ["lambda", "cons", "list", "cons*"]
 
 -- @constant@ is a parser that succeeds if the next token is a
 -- constant (i.e., nil, #t, #f, or a real) and returns it
