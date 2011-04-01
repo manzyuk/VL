@@ -12,9 +12,11 @@ import Control.Applicative
 data Expression
     = Variable Name
     | Constant Scalar
-    | Lambda Name Expression
-    | Application Expression Expression
+    | Lambda [Name] Expression
+    | Application Expression [Expression]
     | Cons Expression Expression
+    | List [Expression]
+    | ConsStar [Expression]
       deriving (Show)
 
 type Parser a = GenParser Token () a
@@ -77,18 +79,23 @@ emptyList = Nil <$ (literate Token.LParen >> literate Token.RParen)
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)
 
-lambda, application, cons, list :: Parser Expression
-lambda      = liftA2 Lambda      (keyword "lambda" *> parens identifier) expression
-application = liftA2 Application expression                              expression
-cons        = liftA2 Cons        (keyword "cons"   *> expression)        expression
+special :: String -> Parser Expression -> Parser Expression
+special name body = keyword name *> body
 
-list        = foldr Cons (Constant Nil) <$> (keyword "list"  *> many expression)
-consStar    = fold  Cons (Constant Nil) <$> (keyword "cons*" *> many expression)
-    where
-      fold :: (b -> b -> b) -> b -> [b] -> b
-      fold step x0 []     = x0
-      fold step x0 [x1]   = x1
-      fold step x0 (x:xs) = step x (fold step x0 xs)
+lambda, application, cons, list :: Parser Expression
+lambda      = special "lambda" $ liftA2 Lambda (parens (many identifier)) expression
+cons        = special "cons"   $ liftA2 Cons   expression                 expression
+list        = special "list"   $ List     <$> (many expression)
+consStar    = special "cons*"  $ ConsStar <$> (many expression)
+application = liftA2 Application expression (many expression)
+
+-- list        = foldr Cons (Constant Nil) <$> (keyword "list"  *> many expression)
+-- consStar    = fold  Cons (Constant Nil) <$> (keyword "cons*" *> many expression)
+--     where
+--       fold :: (b -> b -> b) -> b -> [b] -> b
+--       fold step x0 []     = x0
+--       fold step x0 [x1]   = x1
+--       fold step x0 (x:xs) = step x (fold step x0 xs)
 
 expression :: Parser Expression
 expression = atom <|> form
