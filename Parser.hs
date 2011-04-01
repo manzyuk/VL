@@ -9,14 +9,12 @@ import qualified VL.Token as Token
 import Text.ParserCombinators.Parsec hiding (many, optional, (<|>), Parser)
 import Control.Applicative
 
-data Expression
+data Expression binder
     = Variable Name
     | Constant Scalar
-    | Lambda [Name] Expression
-    | Application Expression [Expression]
-    | Cons Expression Expression
-    | List [Expression]
-    | ConsStar [Expression]
+    | Lambda binder (Expression binder)
+    | Application (Expression binder) (Expression binder)
+    | Cons (Expression binder) (Expression binder)
       deriving (Show)
 
 type Parser a = GenParser Token () a
@@ -57,7 +55,7 @@ identifier = extract getIdentifier
           | otherwise            = Nothing
       getIdentifier _            = Nothing
 
-variable :: Parser Expression
+variable :: Parser (Expression binder)
 variable = Variable <$> identifier
 
 keywords :: [String]
@@ -66,7 +64,7 @@ keywords = ["lambda", "cons", "list", "cons*"]
 -- @constant@ is a parser that succeeds if the next token is a
 -- constant (i.e., nil, #t, #f, or a real) and returns it
 -- suitably wrapped, or fails otherwise.
-constant :: Parser Expression
+constant :: Parser (Expression binder)
 constant = Constant <$> (try emptyList <|> extract getConstant)
     where
       getConstant (Token.Boolean b) = Just (Boolean b)
@@ -79,25 +77,28 @@ emptyList = Nil <$ (literate Token.LParen >> literate Token.RParen)
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)
 
-special :: String -> Parser Expression -> Parser Expression
+special :: String -> Parser a -> Parser a
 special name body = keyword name *> body
 
-lambda, application, cons, list :: Parser Expression
+lambda, cons, list, consStar, application :: Parser (Expression [Name])
 lambda      = special "lambda" $ liftA2 Lambda (parens (many identifier)) expression
 cons        = special "cons"   $ liftA2 Cons   expression                 expression
-list        = special "list"   $ List     <$> (many expression)
-consStar    = special "cons*"  $ ConsStar <$> (many expression)
-application = liftA2 Application expression (many expression)
+list        = special "list"   $ expandList     <$> (many expression)
+consStar    = special "cons*"  $ expandConsStar <$> (many expression)
+application = liftA2 Application expression $ expandConsStar <$> (many expression)
 
--- list        = foldr Cons (Constant Nil) <$> (keyword "list"  *> many expression)
--- consStar    = fold  Cons (Constant Nil) <$> (keyword "cons*" *> many expression)
---     where
---       fold :: (b -> b -> b) -> b -> [b] -> b
---       fold step x0 []     = x0
---       fold step x0 [x1]   = x1
---       fold step x0 (x:xs) = step x (fold step x0 xs)
+expandList :: [Expression binder] -> Expression binder
+expandList = foldr Cons (Constant Nil)
 
-expression :: Parser Expression
+expandConsStar :: [Expression binder] -> Expression binder
+expandConsStar = foldr' Cons (Constant Nil)
+
+foldr' :: (b -> b -> b) -> b -> [b] -> b
+foldr' step x0 []     = x0
+foldr' step x0 [x1]   = x1
+foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
+
+expression :: Parser (Expression [Name])
 expression = atom <|> form
     where
       atom = variable <|> constant
@@ -108,7 +109,7 @@ expression = atom <|> form
              <|> try consStar
              <|> application
 
-parseExpression :: String -> Expression
+parseExpression :: String -> Expression [Name]
 parseExpression = either (\_ -> error "parse error") id
                 . parse (expression <* eof) ""
                 . scan
