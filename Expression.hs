@@ -5,14 +5,17 @@ import VL.Common
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-data Expression
+data Expression binder
     = Variable Name
-    | Lambda Name Expression
-    | Application Expression Expression
-    | Cons Expression Expression
+    | Lambda binder (Expression binder)
+    | Application (Expression binder) (Expression binder)
+    | Cons (Expression binder) (Expression binder)
       deriving (Eq, Ord, Show)
 
-freeVariables :: Expression -> Set Name
+type CoreExpression = Expression Name
+type SurfaceExpression = Expression [Name]
+
+freeVariables :: CoreExpression -> Set Name
 freeVariables (Variable x) = Set.singleton x
 freeVariables (Lambda x e) = Set.delete x (freeVariables e)
 freeVariables (Application e1 e2)

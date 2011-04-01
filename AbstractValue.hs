@@ -10,7 +10,7 @@ data AbstractValue
     = AbstractScalar Scalar
     | AbstractBoolean
     | AbstractReal
-    | AbstractClosure AbstractEnvironment Name Expression
+    | AbstractClosure AbstractEnvironment Name CoreExpression
     | AbstractPair AbstractValue AbstractValue
     | AbstractTop
       deriving (Eq, Ord, Show)

@@ -24,7 +24,7 @@ refineApply (AbstractClosure env x e) v a
 refineApply AbstractTop _ _ = AbstractTop
 refineApply _ _ _ = error "Cannot refine an abstract non-function"
 
-refineEval :: Expression
+refineEval :: CoreExpression
            -> AbstractEnvironment
            -> AbstractAnalysis
            -> AbstractValue
@@ -55,7 +55,7 @@ expandApply (AbstractClosure env x e) v a
 expandApply AbstractTop _ _ = Analysis.empty
 expandApply _ _ _ = error "Cannot expand an abstract non-function"
 
-expandEval :: Expression
+expandEval :: CoreExpression
            -> AbstractEnvironment
            -> AbstractAnalysis
            -> AbstractAnalysis
@@ -75,7 +75,7 @@ u a = Analysis.unions . map u1 . Analysis.domain $ a
       u1 (e, env) = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
-analyze :: Expression
+analyze :: CoreExpression
         -> Environment Scalar   -- Bindings produced by constant conversion
         -> AbstractAnalysis
 analyze e constants = leastFixedPoint u a0

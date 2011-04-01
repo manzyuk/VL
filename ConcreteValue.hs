@@ -7,7 +7,7 @@ import VL.Environment
 
 data ConcreteValue
     = ConcreteScalar Scalar
-    | ConcreteClosure ConcreteEnvironment Name Expression
+    | ConcreteClosure ConcreteEnvironment Name CoreExpression
     | ConcretePair ConcreteValue ConcreteValue
       deriving (Eq, Ord, Show)
 

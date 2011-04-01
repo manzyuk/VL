@@ -6,7 +6,7 @@ import qualified VL.Environment as Environment
 
 import VL.ConcreteValue
 
-eval :: Expression -> ConcreteEnvironment -> ConcreteValue
+eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
 eval (Variable x)        env = Environment.lookup x env
 eval e@(Lambda x b)      env = ConcreteClosure env' x b
     where

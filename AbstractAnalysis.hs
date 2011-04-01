@@ -7,7 +7,7 @@ import VL.AbstractValue
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-type AbstractAnalysis = Map (Expression, AbstractEnvironment) AbstractValue
+type AbstractAnalysis = Map (CoreExpression, AbstractEnvironment) AbstractValue
 
 empty :: AbstractAnalysis
 empty = Map.empty
@@ -18,23 +18,23 @@ union = Map.unionWith unifyValues
 unions :: [AbstractAnalysis] -> AbstractAnalysis
 unions = foldl union empty
 
-lookup :: Expression
+lookup :: CoreExpression
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractValue
 lookup e env a = fromMaybe AbstractTop (Map.lookup (e, env) a)
 
-insert :: Expression
+insert :: CoreExpression
        -> AbstractEnvironment
        -> AbstractValue
        -> AbstractAnalysis
        -> AbstractAnalysis
 insert e env v a = Map.insert (e, env) v a
 
-domain :: AbstractAnalysis -> [(Expression, AbstractEnvironment)]
+domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
 domain = Map.keys
 
-expand :: Expression
+expand :: CoreExpression
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractAnalysis
@@ -44,10 +44,10 @@ expand e env a
     | otherwise
     = empty
 
-member :: (Expression, AbstractEnvironment) -> AbstractAnalysis -> Bool
+member :: (CoreExpression, AbstractEnvironment) -> AbstractAnalysis -> Bool
 member = Map.member
 
-singleton :: Expression
+singleton :: CoreExpression
           -> AbstractEnvironment
           -> AbstractValue
           -> AbstractAnalysis
