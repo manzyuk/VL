@@ -21,7 +21,7 @@ mkGensym prefix = do i <- get
                      put (succ i)
                      return ("#:" ++ prefix ++ "-" ++ show i)
 
-convert' :: Parser.Expression -> Gensym (Environment Scalar, Core.Expression)
+convert' :: Parser.Expression Name -> Gensym (Environment Scalar, Core.Expression)
 convert' (Parser.Variable x)
     = return (Environment.empty, Core.Variable x)
 convert' (Parser.Constant s)
@@ -39,7 +39,7 @@ convert' (Parser.Cons e1 e2)
          (env2, e2') <- convert' e2
          return (env1 `Environment.union` env2, Core.Cons e1' e2')
 
-convert :: Parser.Expression -> (Environment Scalar, Core.Expression)
+convert :: Parser.Expression Name -> (Environment Scalar, Core.Expression)
 convert = flip evalState 0 . convert'
 
 parseAndConvert :: String -> (Environment Scalar, Core.Expression)

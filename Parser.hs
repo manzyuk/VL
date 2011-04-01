@@ -87,10 +87,8 @@ list        = special "list"   $ expandList     <$> (many expression)
 consStar    = special "cons*"  $ expandConsStar <$> (many expression)
 application = liftA2 Application expression $ expandConsStar <$> (many expression)
 
-expandList :: [Expression binder] -> Expression binder
-expandList = foldr Cons (Constant Nil)
-
-expandConsStar :: [Expression binder] -> Expression binder
+expandList, expandConsStar :: [Expression binder] -> Expression binder
+expandList     = foldr  Cons (Constant Nil)
 expandConsStar = foldr' Cons (Constant Nil)
 
 foldr' :: (b -> b -> b) -> b -> [b] -> b
@@ -109,7 +107,34 @@ expression = atom <|> form
              <|> try consStar
              <|> application
 
-parseExpression :: String -> Expression [Name]
-parseExpression = either (\_ -> error "parse error") id
+cdnr :: Int -> Expression binder -> Expression binder
+cdnr n = compose (replicate n cdr)
+    where
+      compose = foldr (.) id
+      cdr = Application (Variable "cdr")
+
+cadnr :: Int -> Expression binder -> Expression binder
+cadnr n = car . cdnr n
+    where
+      car = Application (Variable "car")
+
+transform :: Expression [Name] -> Expression Name
+transform (Lambda []  b) = Lambda "#:ignored" (transform b)
+transform (Lambda [x] b) = Lambda x (transform b)
+transform (Lambda xs  b) = Lambda "#:args" b'
+    where
+      p  = Variable "#:args"
+      b' = foldr wrap (transform b) (zip xs [0..])
+      wrap (x, n) e = Application (Lambda x e) (cadnr n p)
+transform (Variable x) = Variable x
+transform (Constant s) = Constant s
+transform (Application e1 e2)
+    = Application (transform e1) (transform e2)
+transform (Cons e1 e2)
+    = Cons (transform e1) (transform e2)
+
+parseExpression :: String -> Expression Name
+parseExpression = transform
+                . either (\_ -> error "parse error") id
                 . parse (expression <* eof) ""
                 . scan
