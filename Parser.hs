@@ -72,7 +72,7 @@ constant = Constant <$> (try emptyList <|> extract getConstant)
       getConstant _                 = Nothing
 
 emptyList :: Parser Scalar
-emptyList = Nil <$ (literate Token.Quote >> literate Token.LParen >> literate Token.RParen)
+emptyList = Nil <$ (literate Token.LParen >> literate Token.RParen)
 
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)

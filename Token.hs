@@ -8,7 +8,6 @@ data Token
     | Real Float
     | LParen
     | RParen
-    | Quote
       deriving (Eq, Show)
 
 scan :: String -> [Token]
@@ -49,7 +48,6 @@ scan ('#':'t':cs) = Boolean True  : scan cs
 scan ('#':'f':cs) = Boolean False : scan cs
 scan ('('    :cs) = LParen        : scan cs
 scan (')'    :cs) = RParen        : scan cs
-scan ('\''   :cs) = Quote         : scan cs
 
 -- We support comments starting with ; and extending to the end of
 -- line.
