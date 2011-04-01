@@ -1,23 +1,32 @@
 module VL.Parser where
 
 import VL.Common
-import VL.Scalar
+
+import VL.Scalar (Scalar, ScalarEnvironment)
+import qualified VL.Scalar as Scalar
+
+import VL.Expression
+
+import VL.Environment (Environment)
+import qualified VL.Environment as Environment
 
 import VL.Token (Token, scan)
 import qualified VL.Token as Token
 
-import Text.ParserCombinators.Parsec hiding (many, optional, (<|>), Parser)
+import Text.Parsec.Prim       hiding (many, (<|>), State, parse)
+import Text.Parsec.String     hiding (Parser)
+import Text.Parsec.Combinator
+
 import Control.Applicative
+import Control.Monad.State
+import Control.Arrow (first, (***))
 
-data Expression binder
-    = Variable Name
-    | Constant Scalar
-    | Lambda binder (Expression binder)
-    | Application (Expression binder) (Expression binder)
-    | Cons (Expression binder) (Expression binder)
-      deriving (Show)
+nil, true, false :: Name
+nil   = "#:nil"
+true  = "#:true"
+false = "#:false"
 
-type Parser a = GenParser Token () a
+type Parser = ParsecT [Token] () (State (ScalarEnvironment, Int))
 
 -- @extract selector@ is a parser that consumes one token @t@ and
 -- fails if @selector t@ is @Nothing@ or returns @x@ such that
@@ -47,7 +56,7 @@ literate t = extract getLiterate
 -- @identifier@ is a parser that succeeds if the next token is an
 -- identifier that is not a keyword and returns the name of that
 -- identifier, or fails otherwise.
-identifier :: Parser String
+identifier :: Parser Name
 identifier = extract getIdentifier
     where
       getIdentifier (Token.Identifier x)
@@ -55,24 +64,39 @@ identifier = extract getIdentifier
           | otherwise            = Nothing
       getIdentifier _            = Nothing
 
-variable :: Parser (Expression binder)
+variable :: Parser SurfaceExpression
 variable = Variable <$> identifier
 
 keywords :: [String]
 keywords = ["lambda", "cons", "list", "cons*"]
 
--- @constant@ is a parser that succeeds if the next token is a
--- constant (i.e., nil, #t, #f, or a real) and returns it
--- suitably wrapped, or fails otherwise.
-constant :: Parser (Expression binder)
-constant = Constant <$> (try emptyList <|> extract getConstant)
+constant :: Parser SurfaceExpression
+constant = do s <- try emptyList <|> extract getConstant
+              (env, i) <- get
+              let x = case s of
+                        Scalar.Nil           -> nil
+                        Scalar.Boolean True  -> true
+                        Scalar.Boolean False -> false
+                        Scalar.Real _        -> "#:real-" ++ show i
+              put (Environment.update x s env, succ i)
+              return (Variable x)
     where
-      getConstant (Token.Boolean b) = Just (Boolean b)
-      getConstant (Token.Real    r) = Just (Real    r)
+      getConstant (Token.Boolean b) = Just (Scalar.Boolean b)
+      getConstant (Token.Real    r) = Just (Scalar.Real    r)
       getConstant _                 = Nothing
 
+-- -- @constant@ is a parser that succeeds if the next token is a
+-- -- constant (i.e., nil, #t, #f, or a real) and returns it
+-- -- suitably wrapped, or fails otherwise.
+-- constant :: Parser (Expression binder)
+-- constant = Constant <$> (try emptyList <|> extract getConstant)
+--     where
+--       getConstant (Token.Boolean b) = Just (Boolean b)
+--       getConstant (Token.Real    r) = Just (Real    r)
+--       getConstant _                 = Nothing
+
 emptyList :: Parser Scalar
-emptyList = Nil <$ (literate Token.LParen >> literate Token.RParen)
+emptyList = Scalar.Nil <$ (literate Token.LParen >> literate Token.RParen)
 
 parens :: Parser a -> Parser a
 parens = between (literate Token.LParen) (literate Token.RParen)
@@ -80,23 +104,23 @@ parens = between (literate Token.LParen) (literate Token.RParen)
 special :: String -> Parser a -> Parser a
 special name body = keyword name *> body
 
-lambda, cons, list, consStar, application :: Parser (Expression [Name])
+lambda, cons, list, consStar, application :: Parser SurfaceExpression
 lambda      = special "lambda" $ liftA2 Lambda (parens (many identifier)) expression
 cons        = special "cons"   $ liftA2 Cons   expression                 expression
 list        = special "list"   $ expandList     <$> (many expression)
 consStar    = special "cons*"  $ expandConsStar <$> (many expression)
 application = liftA2 Application expression $ expandConsStar <$> (many expression)
 
-expandList, expandConsStar :: [Expression binder] -> Expression binder
-expandList     = foldr  Cons (Constant Nil)
-expandConsStar = foldr' Cons (Constant Nil)
+expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
+expandList     = foldr  Cons (Variable nil)
+expandConsStar = foldr' Cons (Variable nil)
 
 foldr' :: (b -> b -> b) -> b -> [b] -> b
 foldr' step x0 []     = x0
 foldr' step x0 [x1]   = x1
 foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
 
-expression :: Parser (Expression [Name])
+expression :: Parser SurfaceExpression
 expression = atom <|> form
     where
       atom = variable <|> constant
@@ -106,6 +130,20 @@ expression = atom <|> form
              <|> try list
              <|> try consStar
              <|> application
+
+parseAndConvertConstants :: String -> (SurfaceExpression, ScalarEnvironment)
+parseAndConvertConstants
+    = ((either (\_ -> error "parse error") id) *** fst)
+    . flip runState (initialEnvironment, 0)
+    . runParserT expression () ""
+    . scan
+    where
+      initialEnvironment
+          = Environment.fromList
+            [ (nil,   Scalar.Nil          )
+            , (true,  Scalar.Boolean True )
+            , (false, Scalar.Boolean False)
+            ]
 
 cdnr :: Int -> Expression binder -> Expression binder
 cdnr n = compose (replicate n cdr)
@@ -118,7 +156,7 @@ cadnr n = car . cdnr n
     where
       car = Application (Variable "car")
 
-transform :: Expression [Name] -> Expression Name
+transform :: SurfaceExpression -> CoreExpression
 transform (Lambda []  b) = Lambda "#:ignored" (transform b)
 transform (Lambda [x] b) = Lambda x (transform b)
 transform (Lambda xs  b) = Lambda "#:args" b'
@@ -127,14 +165,10 @@ transform (Lambda xs  b) = Lambda "#:args" b'
       b' = foldr wrap (transform b) (zip xs [0..])
       wrap (x, n) e = Application (Lambda x e) (cadnr n p)
 transform (Variable x) = Variable x
-transform (Constant s) = Constant s
 transform (Application e1 e2)
     = Application (transform e1) (transform e2)
 transform (Cons e1 e2)
     = Cons (transform e1) (transform e2)
 
-parseExpression :: String -> Expression Name
-parseExpression = transform
-                . either (\_ -> error "parse error") id
-                . parse (expression <* eof) ""
-                . scan
+parse :: String -> (CoreExpression, ScalarEnvironment)
+parse = first transform . parseAndConvertConstants
