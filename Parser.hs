@@ -15,7 +15,7 @@ import qualified VL.Token as Token
 
 import Text.Parsec.Prim       hiding (many, (<|>), State, parse)
 import Text.Parsec.String     hiding (Parser)
-import Text.Parsec.Combinator
+import Text.Parsec.Combinator (between)
 
 import Control.Applicative
 import Control.Monad.State
@@ -26,6 +26,10 @@ nil   = "#:nil"
 true  = "#:true"
 false = "#:false"
 
+-- A custom parser type that carries around additional state used for
+-- constant conversion.  The state consists of a scalar environment
+-- and an integer count that is used to generate unique variable
+-- names.
 type Parser = ParsecT [Token] () (State (ScalarEnvironment, Int))
 
 -- @extract selector@ is a parser that consumes one token @t@ and
@@ -70,6 +74,10 @@ variable = Variable <$> identifier
 keywords :: [String]
 keywords = ["lambda", "cons", "list", "cons*"]
 
+-- @constant@ is a parser that consumes the next token and fails if it
+-- is not a constant; otherwise it generates a variable name and binds
+-- it to the constant in the environment.  The empty list and booleans
+-- are always bound to the same names.
 constant :: Parser SurfaceExpression
 constant = do s <- try emptyList <|> extract getConstant
               (env, i) <- get
@@ -84,16 +92,6 @@ constant = do s <- try emptyList <|> extract getConstant
       getConstant (Token.Boolean b) = Just (Scalar.Boolean b)
       getConstant (Token.Real    r) = Just (Scalar.Real    r)
       getConstant _                 = Nothing
-
--- -- @constant@ is a parser that succeeds if the next token is a
--- -- constant (i.e., nil, #t, #f, or a real) and returns it
--- -- suitably wrapped, or fails otherwise.
--- constant :: Parser (Expression binder)
--- constant = Constant <$> (try emptyList <|> extract getConstant)
---     where
---       getConstant (Token.Boolean b) = Just (Boolean b)
---       getConstant (Token.Real    r) = Just (Real    r)
---       getConstant _                 = Nothing
 
 emptyList :: Parser Scalar
 emptyList = Scalar.Nil <$ (literate Token.LParen >> literate Token.RParen)
@@ -156,6 +154,9 @@ cadnr n = car . cdnr n
     where
       car = Application (Variable "car")
 
+-- Transform every lambda that takes possibly many arguments into a
+-- combination of lambdas that take only one argument, introducing
+-- suitable argument destructuring.
 transform :: SurfaceExpression -> CoreExpression
 transform (Lambda []  b) = Lambda "#:ignored" (transform b)
 transform (Lambda [x] b) = Lambda x (transform b)
