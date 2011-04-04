@@ -3,7 +3,7 @@ module VL.AbstractValue where
 import VL.Common
 import VL.Scalar
 import VL.Expression
-import VL.Environment (Environment)
+import VL.Environment (Environment, fromList)
 import qualified VL.Environment as Environment
 
 data AbstractValue
@@ -44,7 +44,7 @@ unifyValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
       -- equal, then the environments must contain the same set of
       -- variables.
       unifyEnvironments env1 env2
-          = map unifyBindings (Environment.domain env1)
+          = fromList $ map unifyBindings (Environment.domain env1)
       unifyBindings x
           = (x, (Environment.lookup x env1) `unifyValues` (Environment.lookup x env2))
 unifyValues (AbstractPair v1 v2) (AbstractPair v1' v2')
