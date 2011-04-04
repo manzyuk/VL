@@ -168,16 +168,19 @@ cadnr n = car . cdnr n
 --      ((lambda (x1)
 --         ((lambda (x2)
 --            e)
---          (car (cdr #:args))))
+--          (cdr #:args)))
 --       (car #:args)))
 transform :: SurfaceExpression -> CoreExpression
 transform (Lambda []  b) = Lambda "#:ignored" (transform b)
 transform (Lambda [x] b) = Lambda x (transform b)
-transform (Lambda xs  b) = Lambda "#:args" b'
+transform (Lambda xs  b) = Lambda "#:args" b''
     where
-      p  = Variable "#:args"
-      b' = foldr wrap (transform b) (zip xs [0..])
-      wrap (x, n) e = Application (Lambda x e) (cadnr n p)
+      p   = Variable "#:args"
+      n   = length xs
+      xn  = last xs
+      b'  = Application (Lambda xn (transform b)) (cdnr (n-1) p)
+      b'' = foldr wrap b' (zip xs [0..n-2])
+      wrap (x, k) e = Application (Lambda x e) (cadnr k p)
 transform (Variable x) = Variable x
 transform (Application e1 e2)
     = Application (transform e1) (transform e2)
