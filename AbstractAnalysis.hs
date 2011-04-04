@@ -7,13 +7,16 @@ import VL.AbstractValue
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-type AbstractAnalysis = Map (CoreExpression, AbstractEnvironment) AbstractValue
+newtype AbstractAnalysis
+    = AbstractAnalysis {
+        bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
+      } deriving Eq
 
 empty :: AbstractAnalysis
-empty = Map.empty
+empty = AbstractAnalysis Map.empty
 
 union :: AbstractAnalysis -> AbstractAnalysis -> AbstractAnalysis
-union = Map.unionWith unifyValues
+union a1 a2 = AbstractAnalysis $ Map.unionWith unifyValues (bindings a1) (bindings a2)
 
 unions :: [AbstractAnalysis] -> AbstractAnalysis
 unions = foldl union empty
@@ -22,17 +25,17 @@ lookup :: CoreExpression
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractValue
-lookup e env a = fromMaybe AbstractTop (Map.lookup (e, env) a)
+lookup e env a = fromMaybe AbstractTop (Map.lookup (e, env) (bindings a))
 
 insert :: CoreExpression
        -> AbstractEnvironment
        -> AbstractValue
        -> AbstractAnalysis
        -> AbstractAnalysis
-insert e env v a = Map.insert (e, env) v a
+insert e env v a = AbstractAnalysis $ Map.insert (e, env) v (bindings a)
 
 domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
-domain = Map.keys
+domain = Map.keys . bindings
 
 expand :: CoreExpression
        -> AbstractEnvironment
@@ -45,10 +48,13 @@ expand e env a
     = empty
 
 member :: (CoreExpression, AbstractEnvironment) -> AbstractAnalysis -> Bool
-member = Map.member
+member (e, env) a = (e, env) `Map.member` (bindings a)
+
+toList :: AbstractAnalysis -> [((CoreExpression, AbstractEnvironment), AbstractValue)]
+toList = Map.toList . bindings
 
 singleton :: CoreExpression
           -> AbstractEnvironment
           -> AbstractValue
           -> AbstractAnalysis
-singleton e env v = Map.singleton (e, env) v
+singleton e env v = AbstractAnalysis $ Map.singleton (e, env) v

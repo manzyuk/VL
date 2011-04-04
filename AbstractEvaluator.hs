@@ -80,12 +80,13 @@ analyze :: CoreExpression
         -> AbstractAnalysis
 analyze e constants = leastFixedPoint u a0
     where
-      a0 = Analysis.singleton e (initialAbstractEnvironment ++ bindings) AbstractTop
-      bindings = [(x, AbstractScalar v) | (x, v) <- constants]
+      a0       = Analysis.singleton e env AbstractTop
+      env      = initialAbstractEnvironment `Environment.union` bindings
+      bindings = Environment.map AbstractScalar constants
 
 leastFixedPoint :: Eq a => (a -> a) -> a -> a
 leastFixedPoint f x | f x == x  = x
                     | otherwise = leastFixedPoint f (f x)
 
 initialAbstractEnvironment :: AbstractEnvironment
-initialAbstractEnvironment = [] -- will contain bindings for primitives eventually
+initialAbstractEnvironment = Environment.empty -- will contain bindings for primitives eventually
