@@ -7,7 +7,12 @@ data Scalar
     = Nil
     | Boolean Bool
     | Real Float
-    | Primitive Name
+    | Primitive Primitive
+      deriving (Eq, Ord, Show)
+
+data Primitive
+    = Car
+    | Cdr
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar
