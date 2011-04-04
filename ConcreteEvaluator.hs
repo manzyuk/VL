@@ -137,8 +137,8 @@ interpreter = do
         putStr prompt
         input <- getLine
         let (expression, constants) = parse input
-            environment = Environment.map ConcreteScalar $
-                          primitives `Environment.union` constants
+            environment = Environment.map ConcreteScalar
+                        $ primitives `Environment.union` constants
         putStrLn . render . pp $ eval expression environment
 
       prompt = "vl> "
