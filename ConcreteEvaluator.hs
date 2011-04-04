@@ -35,6 +35,12 @@ dispatch Add = arithmetic (+)
 dispatch Sub = arithmetic (-)
 dispatch Mul = arithmetic (*)
 dispatch Div = arithmetic (/)
+dispatch Eql = comparison (==)
+dispatch Neq = comparison (/=)
+dispatch LTh = comparison (<)
+dispatch LEq = comparison (<=)
+dispatch GTh = comparison (>)
+dispatch GEq = comparison (>=)
 
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
@@ -50,6 +56,12 @@ arithmetic op (ConcretePair (ConcreteScalar (Real r1))
     = ConcreteScalar (Real (r1 `op` r2))
 arithmetic _ _ = error "Cannot perform arithmetics on non-numbers"
 
+comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
+comparison op (ConcretePair (ConcreteScalar (Real r1))
+                            (ConcreteScalar (Real r2)))
+    = ConcreteScalar (Boolean (r1 `op` r2))
+comparison _ _ = error "Cannot compare non-numbers"
+
 primitives :: Environment Scalar
 primitives = Environment.fromList . map (second Primitive) $
              [ ("car", Car)
@@ -58,6 +70,12 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("-"  , Sub)
              , ("*"  , Mul)
              , ("/"  , Div)
+             , ("==" , Eql)
+             , ("/=" , Neq)
+             , ("<"  , LTh)
+             , ("<=" , LEq)
+             , (">"  , GTh)
+             , (">=" , GEq)
              ]
 
 interpreter :: IO ()

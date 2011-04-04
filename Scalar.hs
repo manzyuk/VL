@@ -13,6 +13,7 @@ data Scalar
 data Primitive
     = Car | Cdr
     | Add | Sub | Mul | Div
+    | Eql | Neq | LTh | LEq | GTh | GEq
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar
