@@ -1,5 +1,10 @@
 {-# LANGUAGE TypeSynonymInstances #-}
-module VL.Pretty where
+module VL.Pretty
+    ( Pretty
+    , pp
+    , render
+    )
+    where
 
 import VL.Common
 import VL.Scalar
@@ -35,7 +40,11 @@ instance Pretty Scalar where
     pp (Boolean True)  = text "#t"
     pp (Boolean False) = text "#f"
     pp (Real r)        = float r
-    pp (Primitive p)   = text p
+    pp (Primitive p)   = pp p
+
+instance Pretty Primitive where
+    pp Car = text "car"
+    pp Cdr = text "cdr"
 
 instance Pretty val => Pretty (Environment val) where
     pp = brackets . sep . map ppBinding . Environment.bindings
