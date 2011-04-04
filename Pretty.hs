@@ -43,8 +43,38 @@ instance Pretty Scalar where
     pp (Primitive p)   = pp p
 
 instance Pretty Primitive where
-    pp Car = text "car"
-    pp Cdr = text "cdr"
+    pp Car    = prim "car"
+    pp Cdr    = prim "cdr"
+    pp Add    = prim "+"
+    pp Sub    = prim "-"
+    pp Mul    = prim "*"
+    pp Div    = prim "/"
+    pp Eql    = prim "=="
+    pp Neq    = prim "/="
+    pp LTh    = prim "<"
+    pp LEq    = prim "<="
+    pp GTh    = prim ">"
+    pp GEq    = prim ">="
+    pp Exp    = prim "exp"
+    pp Log    = prim "log"
+    pp Pow    = prim "**"
+    pp Sin    = prim "sin"
+    pp Cos    = prim "cos"
+    pp Tan    = prim "tan"
+    pp Sqrt   = prim "sqrt"
+    pp Asin   = prim "asin"
+    pp Acos   = prim "acos"
+    pp Atan   = prim "atan"
+    pp Sinh   = prim "sinh"
+    pp Cosh   = prim "cosh"
+    pp Tanh   = prim "tanh"
+    pp Asinh  = prim "asinh"
+    pp Acosh  = prim "acosh"
+    pp Atanh  = prim "atanh"
+    pp IfProc = prim "if-procedure"
+
+prim :: String -> Doc
+prim p = text "#<primitive" <+> text p <> char '>'
 
 instance Pretty val => Pretty (Environment val) where
     pp = brackets . sep . map ppBinding . Environment.bindings
