@@ -127,6 +127,13 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("#:if-procedure", IfProc)
              ]
 
+interpret :: String -> String
+interpret input = render . pp $ eval expression environment
+    where
+      (expression, constants) = parse input
+      environment = Environment.map ConcreteScalar
+                  $ primitives `Environment.union` constants
+
 interpreter :: IO ()
 interpreter = do
   hSetBuffering stdin  NoBuffering
@@ -136,9 +143,6 @@ interpreter = do
       repl = do
         putStr prompt
         input <- getLine
-        let (expression, constants) = parse input
-            environment = Environment.map ConcreteScalar
-                        $ primitives `Environment.union` constants
-        putStrLn . render . pp $ eval expression environment
+        putStrLn $ interpret input
 
       prompt = "vl> "
