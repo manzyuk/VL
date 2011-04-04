@@ -11,8 +11,8 @@ data Scalar
       deriving (Eq, Ord, Show)
 
 data Primitive
-    = Car
-    | Cdr
+    = Car | Cdr
+    | Add | Sub | Mul | Div
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar

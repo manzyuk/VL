@@ -11,6 +11,7 @@ import VL.ConcreteValue
 import VL.Parser
 import VL.Pretty
 
+import Control.Arrow (second)
 import Control.Monad (forever)
 import System.IO
 
@@ -30,6 +31,10 @@ apply _ _ = error "Cannot apply a concrete non-function"
 dispatch :: Primitive -> ConcreteValue -> ConcreteValue
 dispatch Car = primCar
 dispatch Cdr = primCdr
+dispatch Add = arithmetic (+)
+dispatch Sub = arithmetic (-)
+dispatch Mul = arithmetic (*)
+dispatch Div = arithmetic (/)
 
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
@@ -39,10 +44,20 @@ primCdr :: ConcreteValue -> ConcreteValue
 primCdr (ConcretePair _ v2) = v2
 primCdr _ = error "Cannot apply cdr to a non-pair"
 
+arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
+arithmetic op (ConcretePair (ConcreteScalar (Real r1))
+                            (ConcreteScalar (Real r2)))
+    = ConcreteScalar (Real (r1 `op` r2))
+arithmetic _ _ = error "Cannot perform arithmetics on non-numbers"
+
 primitives :: Environment Scalar
-primitives = Environment.fromList
-             [ ("car", Primitive Car)
-             , ("cdr", Primitive Cdr)
+primitives = Environment.fromList . map (second Primitive) $
+             [ ("car", Car)
+             , ("cdr", Cdr)
+             , ("+"  , Add)
+             , ("-"  , Sub)
+             , ("*"  , Mul)
+             , ("/"  , Div)
              ]
 
 interpreter :: IO ()
