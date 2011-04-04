@@ -18,6 +18,7 @@ data Primitive
     | Asin | Acos | Atan
     | Sinh | Cosh | Tanh
     | Asinh | Acosh | Atanh
+    | IfProc
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar

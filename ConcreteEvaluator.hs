@@ -58,6 +58,8 @@ dispatch Asinh = unary asinh
 dispatch Acosh = unary acosh
 dispatch Atanh = unary atanh
 
+dispatch IfProc = primIfProc
+
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
 primCar _ = error "Cannot apply car to a non-pair"
@@ -81,6 +83,16 @@ comparison op (ConcretePair (ConcreteScalar (Real r1))
                             (ConcreteScalar (Real r2)))
     = ConcreteScalar (Boolean (r1 `op` r2))
 comparison _ _ = error "Cannot compare non-numbers"
+
+primIfProc :: ConcreteValue -> ConcreteValue
+primIfProc (ConcretePair (ConcreteScalar (Boolean c))
+                         (ConcretePair t e))
+    | c
+    = force t
+    | otherwise
+    = force e
+    where
+      force thunk = apply thunk (ConcreteScalar Nil)
 
 primitives :: Environment Scalar
 primitives = Environment.fromList . map (second Primitive) $
@@ -112,6 +124,7 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("asinh" , Asinh )
              , ("acosh" , Acosh )
              , ("atanh" , Atanh )
+             , ("#:if-procedure", IfProc)
              ]
 
 interpreter :: IO ()

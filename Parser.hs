@@ -109,6 +109,13 @@ list        = special "list"   $ expandList     <$> (many expression)
 consStar    = special "cons*"  $ expandConsStar <$> (many expression)
 application = liftA2 Application expression $ expandConsStar <$> (many expression)
 
+if_ :: Parser SurfaceExpression
+if_ = special "if" $ liftA3 ifProc expression expression expression
+    where
+      ifProc c t e = Application (Variable "#:if-procedure")
+                   $ expandConsStar [c, thunk t, thunk e]
+      thunk b      = Lambda [] b
+
 expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
 expandList     = foldr  Cons (Variable nil)
 expandConsStar = foldr' Cons (Variable nil)
@@ -127,6 +134,7 @@ expression = atom <|> form
              <|> try cons
              <|> try list
              <|> try consStar
+             <|> try if_
              <|> application
 
 parseAndConvertConstants :: String -> (SurfaceExpression, ScalarEnvironment)
