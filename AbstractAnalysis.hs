@@ -1,8 +1,24 @@
-module VL.AbstractAnalysis where
+module VL.AbstractAnalysis
+    ( AbstractAnalysis
+    , empty
+    , union
+    , unions
+    , lookup
+    , insert
+    , domain
+    , expand
+    , member
+    , toList
+    , bindings
+    , singleton
+    )
+    where
 
 import VL.Common
 import VL.Expression
 import VL.AbstractValue
+
+import Prelude hiding (lookup)
 
 import Data.Map (Map)
 import qualified Data.Map as Map

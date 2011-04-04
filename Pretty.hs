@@ -4,13 +4,14 @@ module VL.Pretty where
 import VL.Common
 import VL.Scalar
 import VL.Expression
-import VL.Environment (Environment (..))
+import VL.Environment (Environment)
+import qualified VL.Environment as Environment (bindings)
 
 import VL.ConcreteValue (ConcreteValue (..))
 import VL.AbstractValue (AbstractValue (..))
 
 import VL.AbstractAnalysis (AbstractAnalysis)
-import qualified VL.AbstractAnalysis as Analysis
+import qualified VL.AbstractAnalysis as Analysis (toList)
 
 import Text.PrettyPrint
 
@@ -37,7 +38,7 @@ instance Pretty Scalar where
     pp (Primitive p)   = text p
 
 instance Pretty val => Pretty (Environment val) where
-    pp = brackets . sep . map ppBinding . bindings
+    pp = brackets . sep . map ppBinding . Environment.bindings
         where
           ppBinding (x, v) = parens $ text x <+> char '.' <+> (pp v)
 
