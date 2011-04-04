@@ -1,10 +1,10 @@
 module VL.Environment
     ( Environment
-    , VL.Environment.map
+    , map
     , empty
     , union
     , domain
-    , VL.Environment.lookup
+    , lookup
     , insert
     , update
     , bindings
@@ -16,6 +16,7 @@ module VL.Environment
 
 import VL.Common
 
+import Prelude hiding (map, lookup)
 import qualified Data.List as List
 
 import Data.Set (Set)
