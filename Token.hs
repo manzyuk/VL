@@ -30,6 +30,7 @@ scan ('+':c:cs)
     = Real (read cs' :: Float) : scan cs''
     where
       (cs', cs'') = scanUnsignedReal (c:cs)
+scan ['+'] = [Identifier "+"]
 scan ('-':c:cs)
     | not (isDigit c)
     = Identifier "-" : scan (c:cs)
@@ -37,6 +38,7 @@ scan ('-':c:cs)
     = Real (negate (read cs' :: Float)) : scan cs''
     where
       (cs', cs'') = scanUnsignedReal (c:cs)
+scan ['-'] = [Identifier "-"]
 
 scan s@(c:cs)
     | isDigit c
