@@ -35,11 +35,11 @@ refineApply _ _ _ = error "Cannot refine an abstract non-function"
 dispatch :: Primitive -> AbstractAnalysis -> AbstractValue -> AbstractValue
 dispatch Car   _ = primCar
 dispatch Cdr   _ = primCdr
-dispatch Add   _ = binary (+)
-dispatch Sub   _ = binary (-)
-dispatch Mul   _ = binary (*)
-dispatch Div   _ = binary (/)
-dispatch Pow   _ = binary (**)
+dispatch Add   _ = arithmetic (+)
+dispatch Sub   _ = arithmetic (-)
+dispatch Mul   _ = arithmetic (*)
+dispatch Div   _ = arithmetic (/)
+dispatch Pow   _ = arithmetic (**)
 dispatch Eql   _ = comparison (==)
 dispatch Neq   _ = comparison (/=)
 dispatch LTh   _ = comparison (<)
@@ -68,83 +68,57 @@ dispatch IfProc a = primIfProc a
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
 primCar AbstractTop = AbstractTop
-primCar _ = error "Provably a non-pair passed to car"
+primCar _ = error "Provably a non-pair where a pair is expected"
 
 primCdr :: AbstractValue -> AbstractValue
 primCdr (AbstractPair _ v2) = v2
 primCdr AbstractTop = AbstractTop
-primCdr _ = error "Provably a non-pair passed to cdr"
+primCdr _ = error "Provably a non-pair where a pair is expected"
 
-binary :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
-binary op (AbstractPair (AbstractScalar (Real r1))
-                        (AbstractScalar (Real r2)))
-    = AbstractScalar (Real (r1 `op` r2))
-binary _  (AbstractPair (AbstractScalar (Real _))
-                        AbstractReal)
-    = AbstractReal
-binary _  (AbstractPair AbstractReal
-                        (AbstractScalar (Real _)))
-    = AbstractReal
-binary _  (AbstractPair AbstractReal
-                        AbstractReal)
-    = AbstractReal
-binary _  (AbstractPair (AbstractScalar (Real _))
-                        AbstractTop)
-    = AbstractTop
-binary _  (AbstractPair AbstractTop
-                        (AbstractScalar (Real _)))
-    = AbstractTop
-binary _  (AbstractPair AbstractReal
-                        AbstractTop)
-    = AbstractTop
-binary _  (AbstractPair AbstractTop
-                        AbstractReal)
-    = AbstractTop
-binary _  (AbstractPair AbstractTop
-                        AbstractTop)
-    = AbstractTop
-binary _  AbstractTop
-    = AbstractTop
-binary _ v
-    = error $ "Provably a non-number passed to a binary operation: " ++ show v
+dyadic :: (AbstractValue -> AbstractValue -> AbstractValue)
+       -> AbstractValue
+       -> AbstractValue
+dyadic op (AbstractPair v1 v2) = v1 `op` v2
+dyadic op AbstractTop = AbstractTop
+dyadic op _ = error "Provably a non-pair where a pair is expected"
+
+liftOp :: (Float -> Float -> AbstractValue)
+       -> AbstractValue
+       -> (AbstractValue -> AbstractValue -> AbstractValue)
+liftOp op c = l
+    where
+      l v1 v2 | isNotSomeReal v1 || isNotSomeReal v2
+              = error "Provably a non-number where a number is expected"
+              | v1 == AbstractTop || v2 == AbstractTop
+              = AbstractTop
+              | v1 == AbstractReal || v2 == AbstractReal
+              = c
+      l (AbstractScalar (Real r1)) (AbstractScalar (Real r2)) = r1 `op` r2
+
+isNotSomeReal :: AbstractValue -> Bool
+isNotSomeReal = not . isSomeReal
+
+isSomeReal :: AbstractValue -> Bool
+isSomeReal (AbstractScalar (Real _)) = True
+isSomeReal AbstractReal              = True
+isSomeReal AbstractTop               = True
+isSomeReal _                         = False
+
+arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
+arithmetic op = dyadic $ liftOp op' AbstractReal
+    where
+      op' r1 r2 = AbstractScalar (Real (r1 `op` r2))
 
 comparison :: (Float -> Float -> Bool) -> AbstractValue -> AbstractValue
-comparison op (AbstractPair (AbstractScalar (Real r1))
-                            (AbstractScalar (Real r2)))
-    = AbstractScalar (Boolean (r1 `op` r2))
-comparison _  (AbstractPair (AbstractScalar (Real _))
-                            AbstractReal)
-    = AbstractBoolean
-comparison _  (AbstractPair AbstractReal
-                            (AbstractScalar (Real _)))
-    = AbstractBoolean
-comparison _  (AbstractPair AbstractReal
-                            AbstractReal)
-    = AbstractBoolean
-comparison _  (AbstractPair (AbstractScalar (Real _))
-                            AbstractTop)
-    = AbstractTop
-comparison _  (AbstractPair AbstractTop
-                            (AbstractScalar (Real _)))
-    = AbstractTop
-comparison _  (AbstractPair AbstractReal
-                            AbstractTop)
-    = AbstractTop
-comparison _  (AbstractPair AbstractTop
-                            AbstractReal)
-    = AbstractTop
-comparison _  (AbstractPair AbstractTop
-                            AbstractTop)
-    = AbstractTop
-comparison _  AbstractTop
-    = AbstractTop
-comparison _ _ = error "Provably a non-number passed to a comparison operator"
+comparison op = dyadic $ liftOp op' AbstractBoolean
+    where
+      op' r1 r2 = AbstractScalar (Boolean (r1 `op` r2))
 
 unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
 unary _ AbstractReal = AbstractReal
 unary _ AbstractTop  = AbstractTop
-unary _ _ = error "Provably a non-number passed to a unary function"
+unary _ _ = error "Provably a non-number where a number is expected"
 
 primIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
 primIfProc a (AbstractPair (AbstractScalar (Boolean c))
@@ -167,13 +141,13 @@ primIfProc a (AbstractPair AbstractTop _)
 primIfProc a AbstractTop
     = AbstractTop
 primIfProc a _
-    = error "Provably a non-boolean in the condition of `if'"
+    = error "Provably a non-boolean where a boolean is expected"
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
 refineThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = refineEval e env a
-refineThunk _ _ = error "Not a thunk in `refineThunk'"
+refineThunk _ _ = error "refineThunk: the argument is not a thunk"
 
 refineEval :: CoreExpression
            -> AbstractEnvironment
@@ -227,7 +201,7 @@ expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = Analysis.expand e env a
-expandThunk _ _ = error "Not a thunk in `expandThunk'"
+expandThunk _ _ = error "expandThunk: the argument is not a thunk"
 
 expandEval :: CoreExpression
            -> AbstractEnvironment
