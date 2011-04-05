@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 newtype AbstractAnalysis
     = AbstractAnalysis {
         bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
-      } deriving Eq
+      } deriving (Eq, Show)
 
 empty :: AbstractAnalysis
 empty = AbstractAnalysis Map.empty
@@ -59,9 +59,9 @@ expand :: CoreExpression
        -> AbstractAnalysis
 expand e env a
     | (e, env) `member` a
-    = singleton e env AbstractTop
-    | otherwise
     = empty
+    | otherwise
+    = singleton e env AbstractTop
 
 member :: (CoreExpression, AbstractEnvironment) -> AbstractAnalysis -> Bool
 member (e, env) a = (e, env) `Map.member` (bindings a)
