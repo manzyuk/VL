@@ -150,15 +150,15 @@ primIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
 primIfProc a (AbstractPair (AbstractScalar (Boolean c))
                            (AbstractPair t e))
     | c
-    = force t a
+    = refineThunk t a
     | otherwise
-    = force e a
+    = refineThunk e a
 primIfProc a (AbstractPair (AbstractScalar (Boolean _))
                            AbstractTop)
     = AbstractTop
 primIfProc a (AbstractPair AbstractBoolean
                            (AbstractPair t e))
-    = (force t a) `unifyValues` (force e a)
+    = (refineThunk t a) `unifyValues` (refineThunk e a)
 primIfProc a (AbstractPair AbstractBoolean
                            AbstractTop)
     = AbstractTop
@@ -169,8 +169,11 @@ primIfProc a AbstractTop
 primIfProc a _
     = error "Provably a non-boolean in the condition of `if'"
 
-force :: AbstractValue -> AbstractAnalysis -> AbstractValue
-force thunk a = refineApply thunk (AbstractScalar Nil) a
+refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
+refineThunk (AbstractClosure env x e) a
+    -- We assume that x does not occur in e
+    = refineEval e env a
+refineThunk _ _ = error "Not a thunk in `refineThunk'"
 
 refineEval :: CoreExpression
            -> AbstractEnvironment
@@ -200,10 +203,31 @@ expandApply (AbstractClosure env x e) v a
     = Analysis.expand e (Environment.insert x v env) a
     | otherwise
     = Analysis.empty
+expandApply (AbstractScalar (Primitive IfProc)) v a
+    = expandIfProc v a
 expandApply (AbstractScalar (Primitive p)) _ _
     = Analysis.empty
 expandApply AbstractTop _ _ = Analysis.empty
 expandApply _ _ _ = error "Cannot expand an abstract non-function"
+
+expandIfProc :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
+expandIfProc (AbstractPair (AbstractScalar (Boolean c))
+                           (AbstractPair t e)) a
+    | c
+    = expandThunk t a
+    | otherwise
+    = expandThunk e a
+expandIfProc (AbstractPair AbstractBoolean
+                           (AbstractPair t e)) a
+    = (expandThunk t a) `Analysis.union` (expandThunk e a)
+expandIfProc AbstractTop _ = Analysis.empty
+expandIfProc _ _ = error "Malformed `if'"
+
+expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
+expandThunk (AbstractClosure env x e) a
+    -- We assume that x does not occur in e
+    = Analysis.expand e env a
+expandThunk _ _ = error "Not a thunk in `expandThunk'"
 
 expandEval :: CoreExpression
            -> AbstractEnvironment
