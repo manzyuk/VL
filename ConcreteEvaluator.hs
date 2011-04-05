@@ -11,7 +11,6 @@ import VL.ConcreteValue
 import VL.Parser
 import VL.Pretty
 
-import Control.Arrow (second)
 import Control.Monad (forever)
 import System.IO
 
@@ -94,40 +93,6 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
-
-primitives :: Environment Scalar
-primitives = Environment.fromList . map (second Primitive) $
-             [ ("car"   , Car   )
-             , ("cdr"   , Cdr   )
-             , ("+"     , Add   )
-             , ("-"     , Sub   )
-             , ("*"     , Mul   )
-             , ("/"     , Div   )
-             , ("=="    , Eql   )
-             , ("/="    , Neq   )
-             , ("<"     , LTh   )
-             , ("<="    , LEq   )
-             , (">"     , GTh   )
-             , (">="    , GEq   )
-             , ("exp"   , Exp   )
-             , ("log"   , Log   )
-             , ("**"    , Pow   )
-             , ("sin"   , Sin   )
-             , ("cos"   , Cos   )
-             , ("tan"   , Tan   )
-             , ("sqrt"  , Sqrt  )
-             , ("asin"  , Asin  )
-             , ("acos"  , Acos  )
-             , ("atan"  , Atan  )
-             , ("sinh"  , Sinh  )
-             , ("cosh"  , Cosh  )
-             , ("tanh"  , Tanh  )
-             , ("asinh" , Asinh )
-             , ("acosh" , Acosh )
-             , ("atanh" , Atanh )
-             , ("negate", Neg   )
-             , ("#:if-procedure", IfProc)
-             ]
 
 interpret :: String -> String
 interpret input = render . pp $ eval expression environment
