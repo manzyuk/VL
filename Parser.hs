@@ -116,6 +116,14 @@ if_ = special "if" $ liftA3 ifProc expression expression expression
                    $ expandConsStar [c, thunk t, thunk e]
       thunk b      = Lambda [] b
 
+let_ :: Parser SurfaceExpression
+let_ = special "let" $ liftA2 expandLet bindings expression
+    where
+      bindings       = parens (many binding)
+      binding        = parens (liftA2 (,) identifier expression)
+      expandLet bs e = foldr wrap e bs
+      wrap (x, v) e  = Application (Lambda [x] e) v
+
 expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
 expandList     = foldr  Cons (Variable nil)
 expandConsStar = foldr' Cons (Variable nil)
@@ -135,6 +143,7 @@ expression = atom <|> form
              <|> try list
              <|> try consStar
              <|> try if_
+             <|> try let_
              <|> application
 
 parseAndConvertConstants :: String -> (SurfaceExpression, ScalarEnvironment)
