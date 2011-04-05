@@ -12,6 +12,12 @@ import VL.AbstractValue
 import VL.AbstractAnalysis (AbstractAnalysis)
 import qualified VL.AbstractAnalysis as Analysis
 
+import VL.Parser
+import VL.Pretty
+
+import Control.Monad (forever)
+import System.IO
+
 refineApply :: AbstractValue
             -> AbstractValue
             -> AbstractAnalysis
@@ -21,8 +27,150 @@ refineApply (AbstractClosure env x e) v a
     = Analysis.lookup e (Environment.insert x v env) a
     | otherwise
     = AbstractTop
+refineApply (AbstractScalar (Primitive p)) v a
+    = dispatch p a v
 refineApply AbstractTop _ _ = AbstractTop
 refineApply _ _ _ = error "Cannot refine an abstract non-function"
+
+dispatch :: Primitive -> AbstractAnalysis -> AbstractValue -> AbstractValue
+dispatch Car   _ = primCar
+dispatch Cdr   _ = primCdr
+dispatch Add   _ = binary (+)
+dispatch Sub   _ = binary (-)
+dispatch Mul   _ = binary (*)
+dispatch Div   _ = binary (/)
+dispatch Pow   _ = binary (**)
+dispatch Eql   _ = comparison (==)
+dispatch Neq   _ = comparison (/=)
+dispatch LTh   _ = comparison (<)
+dispatch LEq   _ = comparison (<=)
+dispatch GTh   _ = comparison (>)
+dispatch GEq   _ = comparison (>=)
+dispatch Exp   _ = unary exp
+dispatch Log   _ = unary log
+dispatch Sin   _ = unary sin
+dispatch Cos   _ = unary cos
+dispatch Tan   _ = unary tan
+dispatch Sqrt  _ = unary sqrt
+dispatch Asin  _ = unary asin
+dispatch Acos  _ = unary acos
+dispatch Atan  _ = unary atan
+dispatch Sinh  _ = unary sinh
+dispatch Cosh  _ = unary cosh
+dispatch Tanh  _ = unary tanh
+dispatch Asinh _ = unary asinh
+dispatch Acosh _ = unary acosh
+dispatch Atanh _ = unary atanh
+dispatch Neg   _ = unary negate
+
+dispatch IfProc a = primIfProc a
+
+primCar :: AbstractValue -> AbstractValue
+primCar (AbstractPair v1 _) = v1
+primCar AbstractTop = AbstractTop
+primCar _ = error "Provably a non-pair passed to car"
+
+primCdr :: AbstractValue -> AbstractValue
+primCdr (AbstractPair _ v2) = v2
+primCdr AbstractTop = AbstractTop
+primCdr _ = error "Provably a non-pair passed to cdr"
+
+binary :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
+binary op (AbstractPair (AbstractScalar (Real r1))
+                        (AbstractScalar (Real r2)))
+    = AbstractScalar (Real (r1 `op` r2))
+binary _  (AbstractPair (AbstractScalar (Real _))
+                        AbstractReal)
+    = AbstractReal
+binary _  (AbstractPair AbstractReal
+                        (AbstractScalar (Real _)))
+    = AbstractReal
+binary _  (AbstractPair AbstractReal
+                        AbstractReal)
+    = AbstractReal
+binary _  (AbstractPair (AbstractScalar (Real _))
+                        AbstractTop)
+    = AbstractTop
+binary _  (AbstractPair AbstractTop
+                        (AbstractScalar (Real _)))
+    = AbstractTop
+binary _  (AbstractPair AbstractReal
+                        AbstractTop)
+    = AbstractTop
+binary _  (AbstractPair AbstractTop
+                        AbstractReal)
+    = AbstractTop
+binary _  (AbstractPair AbstractTop
+                        AbstractTop)
+    = AbstractTop
+binary _  AbstractTop
+    = AbstractTop
+binary _ v
+    = error $ "Provably a non-number passed to a binary operation: " ++ show v
+
+comparison :: (Float -> Float -> Bool) -> AbstractValue -> AbstractValue
+comparison op (AbstractPair (AbstractScalar (Real r1))
+                            (AbstractScalar (Real r2)))
+    = AbstractScalar (Boolean (r1 `op` r2))
+comparison _  (AbstractPair (AbstractScalar (Real _))
+                            AbstractReal)
+    = AbstractBoolean
+comparison _  (AbstractPair AbstractReal
+                            (AbstractScalar (Real _)))
+    = AbstractBoolean
+comparison _  (AbstractPair AbstractReal
+                            AbstractReal)
+    = AbstractBoolean
+comparison _  (AbstractPair (AbstractScalar (Real _))
+                            AbstractTop)
+    = AbstractTop
+comparison _  (AbstractPair AbstractTop
+                            (AbstractScalar (Real _)))
+    = AbstractTop
+comparison _  (AbstractPair AbstractReal
+                            AbstractTop)
+    = AbstractTop
+comparison _  (AbstractPair AbstractTop
+                            AbstractReal)
+    = AbstractTop
+comparison _  (AbstractPair AbstractTop
+                            AbstractTop)
+    = AbstractTop
+comparison _  AbstractTop
+    = AbstractTop
+comparison _ _ = error "Provably a non-number passed to a comparison operator"
+
+unary :: (Float -> Float) -> AbstractValue -> AbstractValue
+unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
+unary _ AbstractReal = AbstractReal
+unary _ AbstractTop  = AbstractTop
+unary _ _ = error "Provably a non-number passed to a unary function"
+
+primIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
+primIfProc a (AbstractPair (AbstractScalar (Boolean c))
+                           (AbstractPair t e))
+    | c
+    = force t a
+    | otherwise
+    = force e a
+primIfProc a (AbstractPair (AbstractScalar (Boolean _))
+                           AbstractTop)
+    = AbstractTop
+primIfProc a (AbstractPair AbstractBoolean
+                           (AbstractPair t e))
+    = (force t a) `unifyValues` (force e a)
+primIfProc a (AbstractPair AbstractBoolean
+                           AbstractTop)
+    = AbstractTop
+primIfProc a (AbstractPair AbstractTop _)
+    = AbstractTop
+primIfProc a AbstractTop
+    = AbstractTop
+primIfProc a _
+    = error "Provably a non-boolean in the condition of `if'"
+
+force :: AbstractValue -> AbstractAnalysis -> AbstractValue
+force thunk a = refineApply thunk (AbstractScalar Nil) a
 
 refineEval :: CoreExpression
            -> AbstractEnvironment
@@ -52,6 +200,8 @@ expandApply (AbstractClosure env x e) v a
     = Analysis.expand e (Environment.insert x v env) a
     | otherwise
     = Analysis.empty
+expandApply (AbstractScalar (Primitive p)) _ _
+    = Analysis.empty
 expandApply AbstractTop _ _ = Analysis.empty
 expandApply _ _ _ = error "Cannot expand an abstract non-function"
 
@@ -75,18 +225,58 @@ u a = Analysis.unions . map u1 . Analysis.domain $ a
       u1 (e, env) = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
-analyze :: CoreExpression
-        -> Environment Scalar   -- Bindings produced by constant conversion
-        -> AbstractAnalysis
-analyze e constants = leastFixedPoint u a0
+analyze :: (CoreExpression , ScalarEnvironment) -> AbstractAnalysis
+analyze (expression, constants) = leastFixedPoint u analysis0
     where
-      a0       = Analysis.singleton e env AbstractTop
-      env      = initialAbstractEnvironment `Environment.union` bindings
-      bindings = Environment.map AbstractScalar constants
+      analysis0   = Analysis.singleton expression environment AbstractTop
+      environment = Environment.map AbstractScalar
+                  $ primitives `Environment.union` constants
+
+analyze' :: (CoreExpression , ScalarEnvironment) -> [AbstractAnalysis]
+analyze' (expression, constants) = leastFixedPoint' u analysis0
+    where
+      analysis0   = Analysis.singleton expression environment AbstractTop
+      environment = Environment.map AbstractScalar
+                  $ primitives `Environment.union` constants
 
 leastFixedPoint :: Eq a => (a -> a) -> a -> a
 leastFixedPoint f x | f x == x  = x
                     | otherwise = leastFixedPoint f (f x)
 
-initialAbstractEnvironment :: AbstractEnvironment
-initialAbstractEnvironment = Environment.empty -- will contain bindings for primitives eventually
+leastFixedPoint' :: Eq a => (a -> a) -> a -> [a]
+leastFixedPoint' f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
+    where
+      ys = iterate f x
+      zs = zip ys (tail ys)
+
+interpret :: String -> String
+interpret = render . pp . analyze . parse
+
+interpret' :: String -> String
+interpret' = unlines . map (render . pp) . analyze' . parse
+
+interpreter :: IO ()
+interpreter = do
+  hSetBuffering stdin  NoBuffering
+  hSetBuffering stdout NoBuffering
+  forever repl
+    where
+      repl = do
+        putStr prompt
+        input <- getLine
+        putStrLn $ interpret input
+
+      prompt = "vl> "
+
+interpreter' :: IO ()
+interpreter' = do
+  hSetBuffering stdin  NoBuffering
+  hSetBuffering stdout NoBuffering
+  forever repl
+    where
+      repl = do
+        putStr prompt
+        input <- getLine
+        putStrLn $ interpret' input
+
+      prompt = "vl> "
