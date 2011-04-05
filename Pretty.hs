@@ -71,6 +71,7 @@ instance Pretty Primitive where
     pp Asinh  = prim "asinh"
     pp Acosh  = prim "acosh"
     pp Atanh  = prim "atanh"
+    pp Neg    = prim "negate"
     pp IfProc = prim "if-procedure"
 
 prim :: String -> Doc

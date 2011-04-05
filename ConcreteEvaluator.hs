@@ -57,6 +57,7 @@ dispatch Tanh  = unary tanh
 dispatch Asinh = unary asinh
 dispatch Acosh = unary acosh
 dispatch Atanh = unary atanh
+dispatch Neg   = unary negate
 
 dispatch IfProc = primIfProc
 
@@ -124,6 +125,7 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("asinh" , Asinh )
              , ("acosh" , Acosh )
              , ("atanh" , Atanh )
+             , ("negate", Neg   )
              , ("#:if-procedure", IfProc)
              ]
 

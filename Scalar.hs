@@ -14,7 +14,7 @@ data Primitive
     = Car | Cdr
     | Add | Sub | Mul | Div
     | Eql | Neq | LTh | LEq | GTh | GEq
-    | Exp | Log | Pow | Sin | Cos | Tan | Sqrt
+    | Exp | Log | Pow | Sin | Cos | Tan | Neg | Sqrt
     | Asin | Acos | Atan
     | Sinh | Cosh | Tanh
     | Asinh | Acosh | Atanh
