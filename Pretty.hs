@@ -74,23 +74,22 @@ instance Pretty Primitive where
     pp Neg    = prim "negate"
     pp IfProc = prim "if-procedure"
 
+internal :: String -> Doc -> Doc
+internal name contents = text "#[" <> sep [text name, contents] <> char ']'
+
 prim :: String -> Doc
-prim p = text "#<primitive" <+> text p <> char '>'
+prim = internal "primitive" . text
 
 instance Pretty val => Pretty (Environment val) where
-    pp = brackets . sep . map ppBinding . Environment.bindings
+    pp = parens . sep . map ppBinding . Environment.bindings
         where
-          ppBinding (x, v) = parens $ text x <+> char '.' <+> (pp v)
+          ppBinding (x, v) = ppPair x v
 
 ppClosure :: Pretty val => Environment val -> Name -> CoreExpression -> Doc
-ppClosure env x b = text "#<" <> vcat [ text "closure:"
-                                      , pp env
-                                      , pp (Lambda x b)
-                                      ]
-                              <> char '>'
+ppClosure env x b = internal "closure" $ pp env $+$ pp (Lambda x b)
 
 ppPair :: (Pretty a, Pretty b) => a -> b -> Doc
-ppPair x y = parens (pp x <> comma <+> pp y)
+ppPair x y = parens $ sep [pp x, dot, pp y]
 
 instance Pretty ConcreteValue where
     pp (ConcreteScalar s)        = pp s
@@ -106,13 +105,18 @@ instance Pretty AbstractValue where
     pp (AbstractPair v1 v2)      = ppPair v1 v2
 
 instance Pretty AbstractAnalysis where
-    pp analysis = text "#<" <> vcat [ text "ananlysis:"
-                                    , bindings
-                                    ]
-                            <> char '>'
+    pp analysis = internal "analysis" bindings
         where
-          bindings = vcat . map ppBinding . Analysis.toList $ analysis
+          bindings = vcat
+                   . punctuate newline
+                   . map ppBinding
+                   . Analysis.toList
+                   $ analysis
           ppBinding ((e, env), v) = sep [ ppPair e env
                                         , text "==>"
                                         , pp v
                                         ]
+
+dot, newline :: Doc
+dot     = char '.'
+newline = char '\n'
