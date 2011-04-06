@@ -192,8 +192,10 @@ expandIfProc (AbstractPair (AbstractScalar (Boolean c))
 expandIfProc (AbstractPair AbstractBoolean
                            (AbstractPair t e)) a
     = (expandThunk t a) `Analysis.union` (expandThunk e a)
-expandIfProc AbstractTop _ = Analysis.empty
-expandIfProc _ _ = error "expandIfProc: malformed `if'"
+expandIfProc AbstractTop _
+    = Analysis.empty
+expandIfProc _ _
+    = error "expandIfProc: provably a non-boolean where a boolean is expected"
 
 expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandThunk (AbstractClosure env x e) a
