@@ -32,7 +32,7 @@ empty :: AbstractAnalysis
 empty = AbstractAnalysis Map.empty
 
 union :: AbstractAnalysis -> AbstractAnalysis -> AbstractAnalysis
-union a1 a2 = AbstractAnalysis $ Map.unionWith unifyValues (bindings a1) (bindings a2)
+union a1 a2 = AbstractAnalysis $ Map.union (bindings a1) (bindings a2)
 
 unions :: [AbstractAnalysis] -> AbstractAnalysis
 unions = foldl union empty
