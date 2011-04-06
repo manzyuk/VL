@@ -219,39 +219,33 @@ expandEval :: CoreExpression
 expandEval (Variable _) _ _ = Analysis.empty
 expandEval (Lambda _ _) _ _ = Analysis.empty
 expandEval (Application e1 e2) env a
-    = Analysis.unions [ Analysis.expand e1 env a
-                      , Analysis.expand e2 env a
-                      , expandApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
-                      ]
+    = Analysis.unions
+      [ Analysis.expand e1 env a
+      , Analysis.expand e2 env a
+      , expandApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
+      ]
 expandEval (Cons e1 e2) env a
     = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
 
-u :: AbstractAnalysis -> AbstractAnalysis
-u a = Analysis.unions . map u1 . Analysis.domain $ a
+amendAnalysis :: AbstractAnalysis -> AbstractAnalysis
+amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
     where
-      u1 (e, env) = Analysis.insert e env (refineEval e env a) (expandEval e env a)
+      amendBinding (e, env)
+          = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
 analyze :: (CoreExpression , ScalarEnvironment) -> AbstractAnalysis
-analyze (expression, constants) = leastFixedPoint u analysis0
-    where
-      analysis0   = Analysis.singleton expression environment AbstractTop
-      environment = Environment.map AbstractScalar
-                  $ primitives `Environment.union` constants
+analyze = last . analyze'
 
 analyze' :: (CoreExpression , ScalarEnvironment) -> [AbstractAnalysis]
-analyze' (expression, constants) = leastFixedPoint' u analysis0
+analyze' (expression, constants) = iterateUntilStable amendAnalysis analysis0
     where
       analysis0   = Analysis.singleton expression environment AbstractTop
       environment = Environment.map AbstractScalar
                   $ primitives `Environment.union` constants
 
-leastFixedPoint :: Eq a => (a -> a) -> a -> a
-leastFixedPoint f x | f x == x  = x
-                    | otherwise = leastFixedPoint f (f x)
-
-leastFixedPoint' :: Eq a => (a -> a) -> a -> [a]
-leastFixedPoint' f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
+iterateUntilStable :: Eq a => (a -> a) -> a -> [a]
+iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
     where
       ys = iterate f x
       zs = zip ys (tail ys)
@@ -262,6 +256,9 @@ interpret = render . pp . analyze . parse
 interpret' :: String -> String
 interpret' = unlines . map (render . pp) . analyze' . parse
 
+verbose :: Bool
+verbose = False
+
 interpreter :: IO ()
 interpreter = do
   hSetBuffering stdin  NoBuffering
@@ -271,19 +268,8 @@ interpreter = do
       repl = do
         putStr prompt
         input <- getLine
-        putStrLn $ interpret input
+        putStrLn $ process input
 
       prompt = "vl> "
-
-interpreter' :: IO ()
-interpreter' = do
-  hSetBuffering stdin  NoBuffering
-  hSetBuffering stdout NoBuffering
-  forever repl
-    where
-      repl = do
-        putStr prompt
-        input <- getLine
-        putStrLn $ interpret' input
-
-      prompt = "vl> "
+      process | verbose   = interpret'
+              | otherwise = interpret
