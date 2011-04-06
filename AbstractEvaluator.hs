@@ -128,17 +128,9 @@ refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
     = refineThunk t a
     | otherwise
     = refineThunk e a
-refineIfProc a (AbstractPair (AbstractScalar (Boolean _))
-                             AbstractTop)
-    = AbstractTop
 refineIfProc a (AbstractPair AbstractBoolean
                              (AbstractPair t e))
     = (refineThunk t a) `unifyValues` (refineThunk e a)
-refineIfProc a (AbstractPair AbstractBoolean
-                             AbstractTop)
-    = AbstractTop
-refineIfProc a (AbstractPair AbstractTop _)
-    = AbstractTop
 refineIfProc a AbstractTop
     = AbstractTop
 refineIfProc a _
