@@ -30,11 +30,11 @@ apply _ _ = error "Cannot apply a concrete non-function"
 dispatch :: Primitive -> ConcreteValue -> ConcreteValue
 dispatch Car   = primCar
 dispatch Cdr   = primCdr
-dispatch Add   = binary (+)
-dispatch Sub   = binary (-)
-dispatch Mul   = binary (*)
-dispatch Div   = binary (/)
-dispatch Pow   = binary (**)
+dispatch Add   = arithmetic (+)
+dispatch Sub   = arithmetic (-)
+dispatch Mul   = arithmetic (*)
+dispatch Div   = arithmetic (/)
+dispatch Pow   = arithmetic (**)
 dispatch Eql   = comparison (==)
 dispatch Neq   = comparison (/=)
 dispatch LTh   = comparison (<)
@@ -72,11 +72,11 @@ unary :: (Float -> Float) -> ConcreteValue -> ConcreteValue
 unary f (ConcreteScalar (Real r)) = ConcreteScalar (Real (f r))
 unary _ _ = error "Cannot perform arithmetics on non-numbers"
 
-binary :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
-binary op (ConcretePair (ConcreteScalar (Real r1))
+arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
+arithmetic op (ConcretePair (ConcreteScalar (Real r1))
                             (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
-binary _ _ = error "Cannot perform arithmetics on non-numbers"
+arithmetic _ _ = error "Cannot perform arithmetics on non-numbers"
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
