@@ -177,12 +177,17 @@ expandApply (AbstractClosure env x e) v a
     = Analysis.expand e (Environment.insert x v env) a
     | otherwise
     = Analysis.empty
-expandApply (AbstractScalar (Primitive IfProc)) v a
-    = expandIfProc v a
-expandApply (AbstractScalar (Primitive p)) _ _
-    = Analysis.empty
+expandApply (AbstractScalar (Primitive p)) v a
+    = expandPrimitive p v a
 expandApply AbstractTop _ _ = Analysis.empty
 expandApply _ _ _ = error "Cannot expand an abstract non-function"
+
+expandPrimitive :: Primitive
+                -> AbstractValue
+                -> AbstractAnalysis
+                -> AbstractAnalysis
+expandPrimitive IfProc v a = expandIfProc v a
+expandPrimitive _ _ _      = Analysis.empty
 
 expandIfProc :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandIfProc (AbstractPair (AbstractScalar (Boolean c))
