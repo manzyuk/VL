@@ -93,8 +93,6 @@ liftOp op c = l
       l v1 v2
           | isNotSomeReal v1 || isNotSomeReal v2
           = error "listOp: provably a non-number where a number is expected"
-          | v1 == AbstractTop || v2 == AbstractTop
-          = AbstractTop
           | v1 == AbstractReal || v2 == AbstractReal
           = c
       l (AbstractScalar (Real r1)) (AbstractScalar (Real r2)) = r1 `op` r2
@@ -105,7 +103,6 @@ isNotSomeReal = not . isSomeReal
 isSomeReal :: AbstractValue -> Bool
 isSomeReal (AbstractScalar (Real _)) = True
 isSomeReal AbstractReal              = True
-isSomeReal AbstractTop               = True
 isSomeReal _                         = False
 
 arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
