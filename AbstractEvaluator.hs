@@ -28,71 +28,75 @@ refineApply (AbstractClosure env x e) v a
     | otherwise
     = AbstractTop
 refineApply (AbstractScalar (Primitive p)) v a
-    = dispatch p a v
+    = refinePrimitive p a v
 refineApply AbstractTop _ _ = AbstractTop
-refineApply _ _ _ = error "Cannot refine an abstract non-function"
+refineApply _ _ _ = error "refineApply: can't refine an abstract non-function"
 
-dispatch :: Primitive -> AbstractAnalysis -> AbstractValue -> AbstractValue
-dispatch Car   _ = primCar
-dispatch Cdr   _ = primCdr
-dispatch Add   _ = arithmetic (+)
-dispatch Sub   _ = arithmetic (-)
-dispatch Mul   _ = arithmetic (*)
-dispatch Div   _ = arithmetic (/)
-dispatch Pow   _ = arithmetic (**)
-dispatch Eql   _ = comparison (==)
-dispatch Neq   _ = comparison (/=)
-dispatch LTh   _ = comparison (<)
-dispatch LEq   _ = comparison (<=)
-dispatch GTh   _ = comparison (>)
-dispatch GEq   _ = comparison (>=)
-dispatch Exp   _ = unary exp
-dispatch Log   _ = unary log
-dispatch Sin   _ = unary sin
-dispatch Cos   _ = unary cos
-dispatch Tan   _ = unary tan
-dispatch Sqrt  _ = unary sqrt
-dispatch Asin  _ = unary asin
-dispatch Acos  _ = unary acos
-dispatch Atan  _ = unary atan
-dispatch Sinh  _ = unary sinh
-dispatch Cosh  _ = unary cosh
-dispatch Tanh  _ = unary tanh
-dispatch Asinh _ = unary asinh
-dispatch Acosh _ = unary acosh
-dispatch Atanh _ = unary atanh
-dispatch Neg   _ = unary negate
+refinePrimitive :: Primitive
+                -> AbstractAnalysis
+                -> AbstractValue
+                -> AbstractValue
+refinePrimitive Car   _ = primCar
+refinePrimitive Cdr   _ = primCdr
+refinePrimitive Add   _ = arithmetic (+)
+refinePrimitive Sub   _ = arithmetic (-)
+refinePrimitive Mul   _ = arithmetic (*)
+refinePrimitive Div   _ = arithmetic (/)
+refinePrimitive Pow   _ = arithmetic (**)
+refinePrimitive Eql   _ = comparison (==)
+refinePrimitive Neq   _ = comparison (/=)
+refinePrimitive LTh   _ = comparison (<)
+refinePrimitive LEq   _ = comparison (<=)
+refinePrimitive GTh   _ = comparison (>)
+refinePrimitive GEq   _ = comparison (>=)
+refinePrimitive Exp   _ = unary exp
+refinePrimitive Log   _ = unary log
+refinePrimitive Sin   _ = unary sin
+refinePrimitive Cos   _ = unary cos
+refinePrimitive Tan   _ = unary tan
+refinePrimitive Sqrt  _ = unary sqrt
+refinePrimitive Asin  _ = unary asin
+refinePrimitive Acos  _ = unary acos
+refinePrimitive Atan  _ = unary atan
+refinePrimitive Sinh  _ = unary sinh
+refinePrimitive Cosh  _ = unary cosh
+refinePrimitive Tanh  _ = unary tanh
+refinePrimitive Asinh _ = unary asinh
+refinePrimitive Acosh _ = unary acosh
+refinePrimitive Atanh _ = unary atanh
+refinePrimitive Neg   _ = unary negate
 
-dispatch IfProc a = primIfProc a
+refinePrimitive IfProc a = refineIfProc a
 
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
 primCar AbstractTop = AbstractTop
-primCar _ = error "Provably a non-pair where a pair is expected"
+primCar _ = error "primCar: provably a non-pair where a pair is expected"
 
 primCdr :: AbstractValue -> AbstractValue
 primCdr (AbstractPair _ v2) = v2
 primCdr AbstractTop = AbstractTop
-primCdr _ = error "Provably a non-pair where a pair is expected"
+primCdr _ = error "primCdr: provably a non-pair where a pair is expected"
 
 dyadic :: (AbstractValue -> AbstractValue -> AbstractValue)
        -> AbstractValue
        -> AbstractValue
 dyadic op (AbstractPair v1 v2) = v1 `op` v2
 dyadic op AbstractTop = AbstractTop
-dyadic op _ = error "Provably a non-pair where a pair is expected"
+dyadic op _ = error "dyadic: provably a non-pair where a pair is expected"
 
 liftOp :: (Float -> Float -> AbstractValue)
        -> AbstractValue
        -> (AbstractValue -> AbstractValue -> AbstractValue)
 liftOp op c = l
     where
-      l v1 v2 | isNotSomeReal v1 || isNotSomeReal v2
-              = error "Provably a non-number where a number is expected"
-              | v1 == AbstractTop || v2 == AbstractTop
-              = AbstractTop
-              | v1 == AbstractReal || v2 == AbstractReal
-              = c
+      l v1 v2
+          | isNotSomeReal v1 || isNotSomeReal v2
+          = error "listOp: provably a non-number where a number is expected"
+          | v1 == AbstractTop || v2 == AbstractTop
+          = AbstractTop
+          | v1 == AbstractReal || v2 == AbstractReal
+          = c
       l (AbstractScalar (Real r1)) (AbstractScalar (Real r2)) = r1 `op` r2
 
 isNotSomeReal :: AbstractValue -> Bool
@@ -118,30 +122,30 @@ unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
 unary _ AbstractReal = AbstractReal
 unary _ AbstractTop  = AbstractTop
-unary _ _ = error "Provably a non-number where a number is expected"
+unary _ _ = error "unary: provably a non-number where a number is expected"
 
-primIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
-primIfProc a (AbstractPair (AbstractScalar (Boolean c))
-                           (AbstractPair t e))
+refineIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
+refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
+                             (AbstractPair t e))
     | c
     = refineThunk t a
     | otherwise
     = refineThunk e a
-primIfProc a (AbstractPair (AbstractScalar (Boolean _))
-                           AbstractTop)
+refineIfProc a (AbstractPair (AbstractScalar (Boolean _))
+                             AbstractTop)
     = AbstractTop
-primIfProc a (AbstractPair AbstractBoolean
-                           (AbstractPair t e))
+refineIfProc a (AbstractPair AbstractBoolean
+                             (AbstractPair t e))
     = (refineThunk t a) `unifyValues` (refineThunk e a)
-primIfProc a (AbstractPair AbstractBoolean
-                           AbstractTop)
+refineIfProc a (AbstractPair AbstractBoolean
+                             AbstractTop)
     = AbstractTop
-primIfProc a (AbstractPair AbstractTop _)
+refineIfProc a (AbstractPair AbstractTop _)
     = AbstractTop
-primIfProc a AbstractTop
+refineIfProc a AbstractTop
     = AbstractTop
-primIfProc a _
-    = error "Provably a non-boolean where a boolean is expected"
+refineIfProc a _
+    = error "refineIfProc: provably a non-boolean where a boolean is expected"
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
 refineThunk (AbstractClosure env x e) a
@@ -180,7 +184,7 @@ expandApply (AbstractClosure env x e) v a
 expandApply (AbstractScalar (Primitive p)) v a
     = expandPrimitive p v a
 expandApply AbstractTop _ _ = Analysis.empty
-expandApply _ _ _ = error "Cannot expand an abstract non-function"
+expandApply _ _ _ = error "expandApply: can't expand an abstract non-function"
 
 expandPrimitive :: Primitive
                 -> AbstractValue
@@ -200,7 +204,7 @@ expandIfProc (AbstractPair AbstractBoolean
                            (AbstractPair t e)) a
     = (expandThunk t a) `Analysis.union` (expandThunk e a)
 expandIfProc AbstractTop _ = Analysis.empty
-expandIfProc _ _ = error "Malformed `if'"
+expandIfProc _ _ = error "expandIfProc: malformed `if'"
 
 expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandThunk (AbstractClosure env x e) a
