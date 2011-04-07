@@ -119,17 +119,17 @@ if_ = special "if" $ liftA3 ifProc expression expression expression
 let_ :: Parser SurfaceExpression
 let_ = special "let" $ liftA2 expandLet bindings expression
     where
+      bindings = parens $ many binding
+      binding  = parens $ liftA2 (,) identifier expression
       expandLet bs e = foldr wrap e bs
       wrap (x, v) e  = Application (Lambda [x] e) v
 
 letrec :: Parser SurfaceExpression
-letrec = special "letrec" $ liftA2 Letrec bindings expression
-
-bindings :: Parser [(Name, SurfaceExpression)]
-bindings = parens $ many binding
-
-binding :: Parser (Name, SurfaceExpression)
-binding = parens $ liftA2 (,) identifier expression
+letrec = special "letrec" $ liftA2 Letrec locals expression
+    where
+      local      = parens $ liftA3 (,,) identifier parameters expression
+      locals     = parens $ many local
+      parameters = parens $ many identifier
 
 expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
 expandList     = foldr  Cons (Variable nil)
@@ -211,11 +211,14 @@ transform (Application e1 e2)
     = Application (transform e1) (transform e2)
 transform (Cons e1 e2)
     = Cons (transform e1) (transform e2)
-transform (Letrec bs e)
-    = Letrec bs' e'
+transform (Letrec ls e)
+    = Letrec ls' e'
     where
-      bs' = map (second transform) bs
       e'  = transform e
+      ls' = [ (name, x, b')
+            | (name, xs, b) <- ls
+            , let Lambda x b' = transform (Lambda xs b)
+            ]
 
 parse :: String -> (CoreExpression, ScalarEnvironment)
 parse = first transform . parseAndConvertConstants
