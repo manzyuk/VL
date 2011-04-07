@@ -12,8 +12,10 @@ import VL.AbstractValue
 import VL.AbstractAnalysis (AbstractAnalysis)
 import qualified VL.AbstractAnalysis as Analysis
 
-import VL.Parser
+import VL.Parser (parse)
 import VL.Pretty
+
+import Data.Maybe (isJust)
 
 import Control.Monad (forever)
 import System.IO
@@ -85,35 +87,61 @@ dyadic op (AbstractPair v1 v2) = v1 `op` v2
 dyadic op AbstractTop = AbstractTop
 dyadic op _ = error "dyadic: provably a non-pair where a pair is expected"
 
-liftOp :: (Float -> Float -> AbstractValue)
-       -> AbstractValue
-       -> (AbstractValue -> AbstractValue -> AbstractValue)
-liftOp op c = l
+data Abstraction a
+    = Abstraction {
+      -- view a concrete value of type a as an abstract value
+        convert  :: a -> AbstractValue
+      -- try to extract a value of type a from an abstract value
+      , extract  :: AbstractValue -> Maybe a
+      -- abstract value corresponding to concrete values of type a
+      , abstract :: AbstractValue
+      }
+
+float :: Abstraction Float
+float = Abstraction {
+          convert  = AbstractScalar . Real
+        , extract  = maybeReal
+        , abstract = AbstractReal
+        }
     where
-      l v1 v2
-          | isNotSomeReal v1 || isNotSomeReal v2
-          = error "listOp: provably a non-number where a number is expected"
-          | v1 == AbstractReal || v2 == AbstractReal
-          = c
-      l (AbstractScalar (Real r1)) (AbstractScalar (Real r2)) = r1 `op` r2
+      maybeReal (AbstractScalar (Real r)) = Just r
+      maybeReal _                         = Nothing
 
-isNotSomeReal :: AbstractValue -> Bool
-isNotSomeReal = not . isSomeReal
+bool :: Abstraction Bool
+bool = Abstraction {
+         convert  = AbstractScalar . Boolean
+       , extract  = maybeBoolean
+       , abstract = AbstractBoolean
+       }
+    where
+      maybeBoolean (AbstractScalar (Boolean b)) = Just b
+      maybeBoolean _                            = Nothing
 
-isSomeReal :: AbstractValue -> Bool
-isSomeReal (AbstractScalar (Real _)) = True
-isSomeReal AbstractReal              = True
-isSomeReal _                         = False
+isSomeOfType :: Abstraction a -> AbstractValue -> Bool
+isSomeOfType a v = isJust (extract a v) || v == abstract a
+
+isNotSomeOfType :: Abstraction a -> AbstractValue -> Bool
+isNotSomeOfType a = not . isSomeOfType a
+
+liftOp :: Abstraction a -> Abstraction b -> Abstraction c
+       -> (a -> b -> c)
+       -> (AbstractValue -> AbstractValue -> AbstractValue)
+liftOp a b c op x y
+    | isNotSomeOfType a x || isNotSomeOfType b y
+    = error "liftOp: type error"
+    | x == abstract a || y == abstract b
+    = abstract c
+    | otherwise
+    = convert c (u `op` v)
+      where
+        Just u = extract a x
+        Just v = extract b y
 
 arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
-arithmetic op = dyadic $ liftOp op' AbstractReal
-    where
-      op' r1 r2 = AbstractScalar (Real (r1 `op` r2))
+arithmetic op = dyadic $ liftOp float float float op
 
 comparison :: (Float -> Float -> Bool) -> AbstractValue -> AbstractValue
-comparison op = dyadic $ liftOp op' AbstractBoolean
-    where
-      op' r1 r2 = AbstractScalar (Boolean (r1 `op` r2))
+comparison op = dyadic $ liftOp float float bool op
 
 unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
