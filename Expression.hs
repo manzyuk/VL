@@ -24,10 +24,10 @@ type CoreLocalDefinition = LocalDefinition Name
 --   == (\v1. ... \vn. e) (\u1. e1*) ... (\un. en*)
 --
 -- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
-expandLetrec :: [CoreLocalDefinition]
+transformLetrec :: [CoreLocalDefinition]
                 -> CoreExpression
                 -> CoreExpression
-expandLetrec local_defs body = foldl Application f fs
+transformLetrec local_defs body = foldl Application f fs
     where
       vs = [v | (v, _, _) <- local_defs]
       f  = foldr Lambda body vs

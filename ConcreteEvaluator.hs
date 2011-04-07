@@ -22,7 +22,7 @@ eval e@(Lambda x b)      env = ConcreteClosure env' x b
 eval (Application e1 e2) env = apply (eval e1 env) (eval e2 env)
 eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
 eval (Letrec local_defs body) env
-    = eval (expandLetrec local_defs body) env
+    = eval (transformLetrec local_defs body) env
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
