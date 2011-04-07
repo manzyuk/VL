@@ -10,8 +10,10 @@ data Expression binder
     | Lambda binder (Expression binder)
     | Application (Expression binder) (Expression binder)
     | Cons (Expression binder) (Expression binder)
-    | Letrec [(Name, Expression binder)] (Expression binder)
+    | Letrec [LocalDef binder] (Expression binder)
       deriving (Eq, Ord, Show)
+
+type LocalDef binder = (Name, binder, Expression binder)
 
 type CoreExpression = Expression Name
 type SurfaceExpression = Expression [Name]
