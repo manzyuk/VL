@@ -188,6 +188,8 @@ refineEval (Cons e1 e2) env a
     where
       v1 = Analysis.lookup e1 env a
       v2 = Analysis.lookup e2 env a
+refineEval (Letrec local_defs body) env a
+    = refineEval (transformLetrec local_defs body) env a
 
 expandApply :: AbstractValue
             -> AbstractValue
@@ -245,6 +247,8 @@ expandEval (Application e1 e2) env a
       ]
 expandEval (Cons e1 e2) env a
     = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
+expandEval (Letrec local_defs body) env a
+    = expandEval (transformLetrec local_defs body) env a
 
 amendAnalysis :: AbstractAnalysis -> AbstractAnalysis
 amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
