@@ -88,6 +88,7 @@ instance Pretty Primitive where
     pp IsPair = prim "pair?"
     pp IsReal = prim "real?"
     pp IsBoolean = prim "boolean?"
+    pp RealPrim  = prim "real"
 
 internal :: String -> Doc -> Doc
 internal name contents = text "#[" <> sep [text name, contents] <> char ']'

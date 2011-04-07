@@ -26,6 +26,7 @@ data Primitive
     | IsPair
     | IsReal
     | IsBoolean
+    | RealPrim
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar
@@ -66,4 +67,5 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("pair?" , IsPair)
              , ("real?" , IsReal)
              , ("boolean?", IsBoolean)
+             , ("real"  , RealPrim)
              ]

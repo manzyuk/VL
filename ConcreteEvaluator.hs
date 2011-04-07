@@ -67,6 +67,8 @@ dispatch IsPair    = predicate isPair
 dispatch IsReal    = predicate isReal
 dispatch IsBoolean = predicate isBoolean
 
+dispatch RealPrim  = primReal
+
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
 primCar _ = error "primCar: can't apply car to a non-pair"
@@ -113,6 +115,10 @@ isReal (ConcreteScalar (Real _))       = True
 isReal _                               = False
 isBoolean (ConcreteScalar (Boolean _)) = True
 isBoolean _                            = False
+
+primReal :: ConcreteValue -> ConcreteValue
+primReal v@(ConcreteScalar (Real _)) = v
+primReal _ = error "primReal: the argument is not a real"
 
 interpret :: String -> String
 interpret input = render . pp $ eval expression environment

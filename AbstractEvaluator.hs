@@ -75,6 +75,8 @@ refinePrimitive IsPair _    = predicate isPair
 refinePrimitive IsReal _    = predicate isReal
 refinePrimitive IsBoolean _ = predicate isBoolean
 
+refinePrimitive RealPrim _  = primReal
+
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
 primCar AbstractTop = AbstractTop
@@ -188,9 +190,11 @@ isReal _                               = False
 isBoolean (AbstractScalar (Boolean _)) = True
 isBoolean _                            = False
 
-refineIsPair :: AbstractValue -> AbstractValue
-refineIsPair (AbstractPair _ _) = AbstractScalar (Boolean True)
-refineIsPair _                  = AbstractScalar (Boolean False)
+primReal :: AbstractValue -> AbstractValue
+primReal (AbstractScalar (Real _)) = AbstractReal
+primReal AbstractReal              = AbstractReal
+primReal AbstractTop               = AbstractTop
+primReal _ = error "primReal: the argument is not an abstract real"
 
 refineEval :: CoreExpression
            -> AbstractEnvironment
