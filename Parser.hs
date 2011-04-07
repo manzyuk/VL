@@ -121,8 +121,9 @@ let_ = special "let" $ liftA2 expandLet bindings expression
     where
       bindings = parens $ many binding
       binding  = parens $ liftA2 (,) identifier expression
-      expandLet bs e = foldr wrap e bs
-      wrap (x, v) e  = Application (Lambda [x] e) v
+      expandLet bs e = Application (Lambda xs e) (expandConsStar vs)
+          where
+            (xs, vs) = unzip bs
 
 letrec :: Parser SurfaceExpression
 letrec = special "letrec" $ liftA2 Letrec locals expression
