@@ -84,6 +84,7 @@ instance Pretty Primitive where
     pp Atanh  = prim "atanh"
     pp Neg    = prim "negate"
     pp IfProc = prim "if-procedure"
+    pp IsPair = prim "pair?"
 
 internal :: String -> Doc -> Doc
 internal name contents = text "#[" <> sep [text name, contents] <> char ']'

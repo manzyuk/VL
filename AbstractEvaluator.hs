@@ -69,6 +69,7 @@ refinePrimitive Atanh _ = unary atanh
 refinePrimitive Neg   _ = unary negate
 
 refinePrimitive IfProc a = refineIfProc a
+refinePrimitive IsPair _ = refineIsPair
 
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
@@ -169,6 +170,10 @@ refineThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = refineEval e env a
 refineThunk _ _ = error "refineThunk: the argument is not a thunk"
+
+refineIsPair :: AbstractValue -> AbstractValue
+refineIsPair (AbstractPair _ _) = AbstractScalar (Boolean True)
+refineIsPair _                  = AbstractScalar (Boolean False)
 
 refineEval :: CoreExpression
            -> AbstractEnvironment

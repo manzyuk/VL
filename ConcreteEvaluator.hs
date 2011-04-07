@@ -62,6 +62,8 @@ dispatch Neg   = unary negate
 
 dispatch IfProc = primIfProc
 
+dispatch IsPair = primIsPair
+
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
 primCar _ = error "primCar: can't apply car to a non-pair"
@@ -95,6 +97,10 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
+
+primIsPair :: ConcreteValue -> ConcreteValue
+primIsPair (ConcretePair _ _) = ConcreteScalar (Boolean True)
+primIsPair _                  = ConcreteScalar (Boolean False)
 
 interpret :: String -> String
 interpret input = render . pp $ eval expression environment
