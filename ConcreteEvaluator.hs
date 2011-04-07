@@ -37,7 +37,7 @@ eval (Letrec ls b)       env = foldl apply f fs
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
 apply (ConcreteScalar (Primitive p)) v = dispatch p v
-apply _ _ = error "Cannot apply a concrete non-function"
+apply _ _ = error "apply: can't apply a concrete non-function"
 
 dispatch :: Primitive -> ConcreteValue -> ConcreteValue
 dispatch Car   = primCar
@@ -74,27 +74,27 @@ dispatch IfProc = primIfProc
 
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
-primCar _ = error "Cannot apply car to a non-pair"
+primCar _ = error "primCar: can't apply car to a non-pair"
 
 primCdr :: ConcreteValue -> ConcreteValue
 primCdr (ConcretePair _ v2) = v2
-primCdr _ = error "Cannot apply cdr to a non-pair"
+primCdr _ = error "primCdr: can't apply cdr to a non-pair"
 
 unary :: (Float -> Float) -> ConcreteValue -> ConcreteValue
 unary f (ConcreteScalar (Real r)) = ConcreteScalar (Real (f r))
-unary _ _ = error "Cannot perform arithmetics on non-numbers"
+unary _ _ = error "unary: can't perform arithmetics on non-numbers"
 
 arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
 arithmetic op (ConcretePair (ConcreteScalar (Real r1))
                             (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
-arithmetic _ _ = error "Cannot perform arithmetics on non-numbers"
+arithmetic _ _ = error "arithmetic: can't perform arithmetics on non-numbers"
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
                             (ConcreteScalar (Real r2)))
     = ConcreteScalar (Boolean (r1 `op` r2))
-comparison _ _ = error "Cannot compare non-numbers"
+comparison _ _ = error "comparison: can't compare non-numbers"
 
 primIfProc :: ConcreteValue -> ConcreteValue
 primIfProc (ConcretePair (ConcreteScalar (Boolean c))
