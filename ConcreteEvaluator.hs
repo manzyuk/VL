@@ -21,6 +21,12 @@ eval e@(Lambda x b)      env = ConcreteClosure env' x b
       env' = Environment.restrict (freeVariables e) env
 eval (Application e1 e2) env = apply (eval e1 env) (eval e2 env)
 eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
+eval (Letrec ls b)       env
+    = foldl apply f fs
+    where
+      ns = [n | (n, _, _) <- ls]
+      f  = eval (foldr Lambda b ns) env
+      fs = [eval (Lambda x (Letrec ls e)) env | (_, x, e) <- ls]
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
