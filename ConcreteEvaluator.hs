@@ -21,18 +21,8 @@ eval e@(Lambda x b)      env = ConcreteClosure env' x b
       env' = Environment.restrict (freeVariables e) env
 eval (Application e1 e2) env = apply (eval e1 env) (eval e2 env)
 eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
--- The evaluation rule for `letrec' is taken from "Theories of
--- Programming Languages" by John C. Reynolds (Section 11.3, p. 230):
---
--- letrec v1 = \u1. e1, ..., vn = \un. en in e
---   == (\v1. ... \vn. e) (\u1. e1*) ... (\un. en*)
---
--- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
-eval (Letrec ls b)       env = foldl apply f fs
-    where
-      ns = [n | (n, _, _) <- ls]
-      f  = eval (foldr Lambda b ns) env
-      fs = [eval (Lambda x (Letrec ls e)) env | (_, x, e) <- ls]
+eval (Letrec local_defs body) env
+    = eval (expandLetrec local_defs body) env
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
