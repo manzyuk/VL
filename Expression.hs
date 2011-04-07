@@ -2,7 +2,7 @@ module VL.Expression where
 
 import VL.Common
 
-import Data.Set (Set)
+import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 
 data Expression binder
@@ -25,3 +25,8 @@ freeVariables (Application e1 e2)
     = (freeVariables e1) `Set.union` (freeVariables e2)
 freeVariables (Cons e1 e2)
     = (freeVariables e1) `Set.union` (freeVariables e2)
+freeVariables (Letrec ls e)
+    = ((freeVariables e) `Set.union` vs) \\ ns
+    where
+      ns = Set.fromList [n | (n, _, _) <- ls]
+      vs = Set.unions [Set.delete x (freeVariables e) | (_, x, e) <- ls]
