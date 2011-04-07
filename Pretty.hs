@@ -34,6 +34,17 @@ instance Pretty binder => Pretty (Expression binder) where
         = parens $ sep [pp e1, pp e2]
     pp (Cons e1 e2)
         = parens $ sep [text "cons", pp e1, pp e2]
+    pp (Letrec local_defs body)
+        = parens $ sep [ text "letrec"
+                       , ppLocalDefinitions local_defs
+                       , pp body
+                       ]
+        where
+          ppLocalDefinitions = parens . sep . map ppLocalDefinition
+          ppLocalDefinition (v, u, e) = parens $ sep [ text v
+                                                     , parens (pp u)
+                                                     , pp e
+                                                     ]
 
 instance Pretty Scalar where
     pp Nil             = parens empty
