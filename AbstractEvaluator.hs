@@ -69,7 +69,11 @@ refinePrimitive Atanh _ = unary atanh
 refinePrimitive Neg   _ = unary negate
 
 refinePrimitive IfProc a = refineIfProc a
-refinePrimitive IsPair _ = refineIsPair
+
+refinePrimitive IsNull _    = predicate isNull
+refinePrimitive IsPair _    = predicate isPair
+refinePrimitive IsReal _    = predicate isReal
+refinePrimitive IsBoolean _ = predicate isBoolean
 
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
@@ -170,6 +174,19 @@ refineThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = refineEval e env a
 refineThunk _ _ = error "refineThunk: the argument is not a thunk"
+
+predicate :: (AbstractValue -> Bool) -> AbstractValue -> AbstractValue
+predicate p = AbstractScalar . Boolean . p
+
+isNull, isPair, isReal, isBoolean :: AbstractValue -> Bool
+isNull (AbstractScalar Nil)            = True
+isNull _                               = False
+isPair (AbstractPair _ _)              = True
+isPair _                               = False
+isReal (AbstractScalar (Real _))       = True
+isReal _                               = False
+isBoolean (AbstractScalar (Boolean _)) = True
+isBoolean _                            = False
 
 refineIsPair :: AbstractValue -> AbstractValue
 refineIsPair (AbstractPair _ _) = AbstractScalar (Boolean True)

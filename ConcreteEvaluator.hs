@@ -62,7 +62,10 @@ dispatch Neg   = unary negate
 
 dispatch IfProc = primIfProc
 
-dispatch IsPair = primIsPair
+dispatch IsNull    = predicate isNull
+dispatch IsPair    = predicate isPair
+dispatch IsReal    = predicate isReal
+dispatch IsBoolean = predicate isBoolean
 
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
@@ -98,9 +101,18 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     where
       force thunk = apply thunk (ConcreteScalar Nil)
 
-primIsPair :: ConcreteValue -> ConcreteValue
-primIsPair (ConcretePair _ _) = ConcreteScalar (Boolean True)
-primIsPair _                  = ConcreteScalar (Boolean False)
+predicate :: (ConcreteValue -> Bool) -> ConcreteValue -> ConcreteValue
+predicate p = ConcreteScalar . Boolean . p
+
+isNull, isPair, isReal, isBoolean :: ConcreteValue -> Bool
+isNull (ConcreteScalar Nil)            = True
+isNull _                               = False
+isPair (ConcretePair _ _)              = True
+isPair _                               = False
+isReal (ConcreteScalar (Real _))       = True
+isReal _                               = False
+isBoolean (ConcreteScalar (Boolean _)) = True
+isBoolean _                            = False
 
 interpret :: String -> String
 interpret input = render . pp $ eval expression environment

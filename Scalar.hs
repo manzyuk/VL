@@ -22,7 +22,10 @@ data Primitive
     | Sinh | Cosh | Tanh
     | Asinh | Acosh | Atanh
     | IfProc
+    | IsNull
     | IsPair
+    | IsReal
+    | IsBoolean
       deriving (Eq, Ord, Show)
 
 type ScalarEnvironment = Environment Scalar
@@ -59,5 +62,8 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("atanh" , Atanh )
              , ("negate", Neg   )
              , ("#:if-procedure", IfProc)
+             , ("null?" , IsNull)
              , ("pair?" , IsPair)
+             , ("real?" , IsReal)
+             , ("boolean?", IsBoolean)
              ]
