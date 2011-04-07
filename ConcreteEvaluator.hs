@@ -28,8 +28,7 @@ eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
 --   == (\v1. ... \vn. e) (\u1. e1*) ... (\un. en*)
 --
 -- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
-eval (Letrec ls b)       env
-    = foldl apply f fs
+eval (Letrec ls b)       env = foldl apply f fs
     where
       ns = [n | (n, _, _) <- ls]
       f  = eval (foldr Lambda b ns) env
