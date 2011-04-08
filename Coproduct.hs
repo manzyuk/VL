@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances            #-}
 module VL.Coproduct where
 
-data (f :+: g) a = Inl (f a) | Inr (g a)
+data (f :+: g) a = Inl (f a) | Inr (g a) deriving (Eq, Ord)
 infixr 6 :+:
 
 instance (Functor f, Functor g) => Functor (f :+: g) where
