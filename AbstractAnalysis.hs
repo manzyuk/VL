@@ -26,7 +26,7 @@ import qualified Data.Map as Map
 newtype AbstractAnalysis
     = AbstractAnalysis {
         bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
-      } deriving (Eq, Show)
+      } deriving Eq
 
 empty :: AbstractAnalysis
 empty = AbstractAnalysis Map.empty

@@ -13,7 +13,7 @@ data AbstractValue
     | AbstractClosure AbstractEnvironment Name CoreExpression
     | AbstractPair AbstractValue AbstractValue
     | AbstractTop
-      deriving (Eq, Ord, Show)
+      deriving (Eq, Ord)
 
 type AbstractEnvironment = Environment AbstractValue
 
