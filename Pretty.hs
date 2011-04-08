@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeSynonymInstances, TypeOperators #-}
 module VL.Pretty
     ( Pretty
     , pp
@@ -8,6 +8,7 @@ module VL.Pretty
 
 import VL.Common
 import VL.Scalar
+import VL.Coproduct
 import VL.Expression
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment (bindings)
@@ -26,26 +27,98 @@ class Pretty a where
 instance Pretty Name where
     pp = text
 
-instance Pretty binder => Pretty (Expression binder) where
-    pp (Variable x) = pp x
-    pp (Lambda x b)
-        = parens $ hang (text "lambda" <+> parens (pp x)) 1 (pp b)
-    pp (Application e1 e2)
-        = parens $ sep [pp e1, pp e2]
-    pp (Cons e1 e2)
-        = parens $ sep [text "cons", pp e1, pp e2]
-    pp (Letrec local_defs body)
-        = parens $ sep [ text "letrec"
-                       , ppLocalDefinitions local_defs
-                       , pp body
+-- Pretty-printing of expressions
+class Functor f => Display f where
+    displayAlg :: f Doc -> Doc
+
+instance Display f => Pretty (Expr f) where
+    pp = foldExpr displayAlg
+
+instance Display Variable where
+    displayAlg (Variable x) = text x
+
+instance Display LambdaOneArg where
+    displayAlg (LambdaOneArg arg body)
+        = parens $ hang (text "lambda" <+> parens (text arg)) 1 body
+
+instance Display LambdaManyArgs where
+    displayAlg (LambdaManyArgs args body)
+        = parens $ hang (text "lambda" <+> parens (sepMap text args)) 1 body
+
+instance Display ApplicationOneArg where
+    displayAlg (ApplicationOneArg operator operand)
+        = parens $ sep [operator, operand]
+
+instance Display ApplicationManyArgs where
+    displayAlg (ApplicationManyArgs operator operands)
+        = parens $ sep (operator : operands)
+
+instance Display Cons where
+    displayAlg (Cons x1 x2)
+        = parens $ sep [text "cons", x1, x2]
+
+instance Display List where
+    displayAlg (List xs)
+        = parens $ sep (text "list" : xs)
+
+instance Display ConsStar where
+    displayAlg (ConsStar xs)
+        = parens $ sep (text "cons*" : xs)
+
+instance Display If where
+    displayAlg (If predicate consequent alternate)
+        = parens $ sep [text "if", predicate, consequent, alternate]
+
+instance Display Or where
+    displayAlg (Or xs)
+        = parens $ sep (text "or" : xs)
+
+instance Display And where
+    displayAlg (And xs)
+        = parens $ sep (text "and" : xs)
+
+instance Display Cond where
+    displayAlg (Cond clauses)
+        = parens $ sep (text "cond" : map ppClause clauses)
+        where
+          ppClause (test, expression) = parens $ sep [test, expression]
+
+instance Display Let where
+    displayAlg (Let bindings body)
+        = parens $ sep [ text "let"
+                       , parens . sepMap ppBinding $ bindings
+                       , body
                        ]
         where
-          ppLocalDefinitions = parens . sep . map ppLocalDefinition
-          ppLocalDefinition (v, u, e) = parens $ sep [ text v
-                                                     , parens (pp u)
-                                                     , pp e
-                                                     ]
+          ppBinding (name, expression) = parens $ sep [text name, expression]
 
+instance Display LetrecOneArg where
+    displayAlg (LetrecOneArg bindings body)
+        = parens $ sep [ text "letrec"
+                       , parens . sepMap ppBinding $ bindings
+                       , body
+                       ]
+        where
+          ppBinding (name, arg, body)
+              = parens $ sep [text name, parens (text arg), body]
+
+instance Display LetrecManyArgs where
+    displayAlg (LetrecManyArgs bindings body)
+        = parens $ sep [ text "letrec"
+                       , parens . sepMap ppBinding $ bindings
+                       , body]
+        where
+          ppBinding (name, args, body)
+              = parens $ sep [text name, parens (sepMap text args), body]
+
+sepMap :: (a -> Doc) -> [a] -> Doc
+sepMap f = sep . map f
+
+instance (Display f, Display g) => Display (f :+: g) where
+    displayAlg (Inl x) = displayAlg x
+    displayAlg (Inr x) = displayAlg x
+
+-- Pretty-printing of scalars
 instance Pretty Scalar where
     pp Nil             = parens empty
     pp (Boolean True)  = text "#t"
@@ -53,6 +126,7 @@ instance Pretty Scalar where
     pp (Real r)        = float r
     pp (Primitive p)   = pp p
 
+-- Pretty-printing of primitives
 instance Pretty Primitive where
     pp Car    = prim "car"
     pp Cdr    = prim "cdr"
@@ -102,7 +176,7 @@ instance Pretty val => Pretty (Environment val) where
           ppBinding (x, v) = ppPair x v
 
 ppClosure :: Pretty val => Environment val -> Name -> CoreExpression -> Doc
-ppClosure env x b = internal "closure" $ pp env $+$ pp (Lambda x b)
+ppClosure env x b = internal "closure" $ pp env $+$ pp (mkLambdaOneArg x b)
 
 ppPair :: (Pretty a, Pretty b) => a -> b -> Doc
 ppPair x y = parens $ sep [pp x, dot, pp y]
