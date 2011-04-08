@@ -7,7 +7,7 @@ module VL.Expression where
 import VL.Common
 import VL.Coproduct
 
-import Control.Arrow (second)
+import Control.Arrow (second, (***))
 
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
@@ -122,6 +122,9 @@ instance Functor Or where
 
 instance Functor And where
     fmap f (And xs) = And (map f xs)
+
+instance Functor Cond where
+    fmap f (Cond clauses) = Cond (map (f *** f) clauses)
 
 instance Functor Let where
     fmap f (Let bindings body)
@@ -275,3 +278,153 @@ instance FreeVariables LetrecManyArgs where
                             | (name, _, _)    <- bindings ]
           vs = Set.unions   [ body \\ (Set.fromList args)
                             | (_, args, body) <- bindings ]
+
+instance (FreeVariables f, FreeVariables g) => FreeVariables (f :+: g) where
+    freeVariablesAlg (Inl x) = freeVariablesAlg x
+    freeVariablesAlg (Inr x) = freeVariablesAlg x
+
+-- Equality of expressions
+class Eq' f where
+    isEqual :: Eq' g => f (Expr g) -> f (Expr g) -> Bool
+
+instance Eq' f => Eq (Expr f) where
+    (In t1) == (In t2) = t1 `isEqual` t2
+
+instance Eq' Variable where
+    isEqual (Variable x1) (Variable x2) = x1 == x2
+
+instance Eq' LambdaOneArg where
+    isEqual (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
+        = arg1 == arg2 && body1 == body2
+
+instance Eq' LambdaManyArgs where
+    isEqual (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
+        = args1 == args2 && body1 == body2
+
+instance Eq' ApplicationOneArg where
+    isEqual (ApplicationOneArg operator1 operand1)
+                (ApplicationOneArg operator2 operand2)
+        = operator1 == operator2 && operand1 == operand2
+
+instance Eq' ApplicationManyArgs where
+    isEqual (ApplicationManyArgs operator1 operands1)
+                (ApplicationManyArgs operator2 operands2)
+        = operator1 == operator2 && operands1 == operands2
+
+instance Eq' Cons where
+    isEqual (Cons x1 y1) (Cons x2 y2) = x1 == x2 && y1 == y2
+
+instance Eq' List where
+    isEqual (List xs1) (List xs2) = xs1 == xs2
+
+instance Eq' ConsStar where
+    isEqual (ConsStar xs1) (ConsStar xs2) = xs1 == xs2
+
+instance Eq' If where
+    isEqual (If predicate1 consequent1 alternate1)
+                (If predicate2 consequent2 alternate2)
+        = predicate1 == predicate2
+                && consequent1 == consequent2
+                       && alternate1 == alternate2
+
+instance Eq' Or where
+    isEqual (Or xs1) (Or xs2) = xs1 == xs2
+
+instance Eq' And where
+    isEqual (And xs1) (And xs2) = xs1 == xs2
+
+instance Eq' Cond where
+    isEqual (Cond clauses1) (Cond clauses2) = clauses1 == clauses2
+
+instance Eq' Let where
+    isEqual (Let bindings1 body1) (Let bindings2 body2)
+        = bindings1 == bindings2 && body1 == body2
+
+instance Eq' LetrecOneArg where
+    isEqual (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
+        = bindings1 == bindings2 && body1 == body2
+
+instance Eq' LetrecManyArgs where
+    isEqual (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
+        = bindings1 == bindings2 && body1 == body2
+
+instance (Eq' f, Eq' g) => Eq' (f :+: g) where
+    (Inl x) `isEqual` (Inl y) = x `isEqual` y
+    (Inr x) `isEqual` (Inr y) = x `isEqual` y
+    isEqual _ _               = False
+
+-- Ordering of expressions
+class Ord' f where
+    compare' :: (Eq' g, Ord' g) => f (Expr g) -> f (Expr g) -> Ordering
+
+instance (Eq' f, Ord' f) => Ord (Expr f) where
+    compare (In t1) (In t2) = compare' t1 t2
+
+instance Ord' Variable where
+    compare' (Variable x1) (Variable x2) = compare x1 x2
+
+instance Ord' LambdaOneArg where
+    compare' (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
+        = compare (arg1, body1) (arg2, body2)
+
+instance Ord' LambdaManyArgs where
+    compare' (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
+        = compare (args1, body1) (args2, body2)
+
+instance Ord' ApplicationOneArg where
+    compare' (ApplicationOneArg operator1 operand1)
+             (ApplicationOneArg operator2 operand2)
+        = compare (operator1, operand1) (operator2, operand2)
+
+instance Ord' ApplicationManyArgs where
+    compare' (ApplicationManyArgs operator1 operands1)
+             (ApplicationManyArgs operator2 operands2)
+        = compare (operator1, operands1) (operator2, operands2)
+
+instance Ord' Cons where
+    compare' (Cons x1 y1) (Cons x2 y2) = compare (x1, y1) (x2, y2)
+
+instance Ord' List where
+    compare' (List xs1) (List xs2) = compare xs1 xs2
+
+instance Ord' ConsStar where
+    compare' (ConsStar xs1) (ConsStar xs2) = compare xs1 xs2
+
+instance Ord' If where
+    compare' (If predicate1 consequent1 alternate1)
+             (If predicate2 consequent2 alternate2)
+        = compare (predicate1, consequent1, alternate1)
+                  (predicate2, consequent2, alternate2)
+
+instance Ord' Or where
+    compare' (Or xs1) (Or xs2) = compare xs1 xs2
+
+instance Ord' And where
+    compare' (And xs1) (And xs2) = compare xs1 xs2
+
+instance Ord' Let where
+    compare' (Let bindings1 body1) (Let bindings2 body2)
+        = compare (bindings1, body1) (bindings2, body2)
+
+instance Ord' LetrecOneArg where
+    compare' (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
+        = compare (bindings1, body1) (bindings2, body2)
+
+instance Ord' LetrecManyArgs where
+    compare' (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
+        = compare (bindings1, body1) (bindings2, body2)
+
+instance (Ord' f, Ord' g) => Ord' (f :+: g) where
+    compare' (Inl x) (Inl y) = compare' x y
+    compare' (Inr x) (Inr y) = compare' x y
+    compare' (Inl x) (Inr y) = LT
+    compare' (Inr x) (Inl y) = GT
+
+-- Type synonyms for the most important expression types
+type Core  =  Variable
+          :+: LambdaOneArg
+          :+: ApplicationOneArg
+          :+: Cons
+          :+: LetrecOneArg
+
+type CoreExpression = Expr Core
