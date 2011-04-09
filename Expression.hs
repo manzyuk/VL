@@ -421,10 +421,27 @@ instance (Ord' f, Ord' g) => Ord' (f :+: g) where
     compare' (Inr x) (Inl y) = GT
 
 -- Type synonyms for the most important expression types
-type Core  =  Variable
-          :+: LambdaOneArg
-          :+: ApplicationOneArg
-          :+: Cons
-          :+: LetrecOneArg
+type Core
+    =     Variable
+      :+: LambdaOneArg
+      :+: ApplicationOneArg
+      :+: Cons
+      :+: LetrecOneArg
 
 type CoreExpression = Expr Core
+
+type Surface
+    =     Variable
+      :+: LambdaManyArgs
+      :+: ApplicationManyArgs
+      :+: Cons
+      :+: List
+      :+: ConsStar
+      :+: If
+      :+: Or
+      :+: And
+      :+: Cond
+      :+: Let
+      :+: LetrecManyArgs
+
+type SurfaceExpression = Expr Surface
