@@ -208,7 +208,6 @@ parseAndConvertConstants
 -- Code transformations
 
 -- Elimination of derived conditionals (or, and, cond)
-
 type Stage1  =  Variable
             :+: LambdaManyArgs
             :+: ApplicationManyArgs
@@ -237,7 +236,7 @@ instance ElimConditionals ApplicationManyArgs where
         = mkApplicationManyArgs operator operands
 
 instance ElimConditionals Cons where
-    elimConditionalsAlg (Cons x1 x2) = mkCons x1 x2
+    elimConditionalsAlg (Cons x y) = mkCons x y
 
 instance ElimConditionals List where
     elimConditionalsAlg (List xs) = mkList xs
@@ -275,6 +274,59 @@ instance (Functor f, ElimConditionals f, Functor g, ElimConditionals g)
     => ElimConditionals (f :+: g) where
     elimConditionalsAlg (Inl x) = elimConditionalsAlg x
     elimConditionalsAlg (Inr x) = elimConditionalsAlg x
+
+-- Elimination of if
+type Stage2  =  Variable
+            :+: LambdaManyArgs
+            :+: ApplicationManyArgs
+            :+: Cons
+            :+: List
+            :+: ConsStar
+            :+: Let
+            :+: LetrecManyArgs
+
+elimIf :: Expr Stage1 -> Expr Stage2
+elimIf = foldExpr elimIfAlg
+
+class Functor f => ElimIf f where
+    elimIfAlg :: f (Expr Stage2) -> Expr Stage2
+
+instance ElimIf Variable where
+    elimIfAlg (Variable x) = mkVariable x
+
+instance ElimIf LambdaManyArgs where
+    elimIfAlg (LambdaManyArgs args body) = mkLambdaManyArgs args body
+
+instance ElimIf ApplicationManyArgs where
+    elimIfAlg (ApplicationManyArgs operator operands)
+        = mkApplicationManyArgs operator operands
+
+instance ElimIf Cons where
+    elimIfAlg (Cons x y) = mkCons x y
+
+instance ElimIf List where
+    elimIfAlg (List xs) = mkList xs
+
+instance ElimIf ConsStar where
+    elimIfAlg (ConsStar xs) = mkConsStar xs
+
+instance ElimIf If where
+    elimIfAlg (If predicate consequent alternate)
+        = mkApplicationManyArgs (mkVariable "#:if-procedure")
+                                [(thunk consequent), (thunk alternate)]
+        where
+          thunk e = mkLambdaManyArgs [] e
+
+instance ElimIf Let where
+    elimIfAlg (Let bindings body) = mkLet bindings body
+
+instance ElimIf LetrecManyArgs where
+    elimIfAlg (LetrecManyArgs bindings body)
+        = mkLetrecManyArgs bindings body
+
+instance (Functor f, ElimIf f, Functor g, ElimIf g) => ElimIf (f :+: g) where
+    elimIfAlg (Inl x) = elimIfAlg x
+    elimIfAlg (Inr x) = elimIfAlg x
 
 -- cdnr :: Int -> Expression binder -> Expression binder
 -- cdnr n = compose (replicate n cdr)
