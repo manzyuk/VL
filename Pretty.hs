@@ -100,7 +100,7 @@ instance Display LetrecOneArg where
                        ]
         where
           ppBinding (name, arg, body)
-              = parens $ sep [text name, parens (text arg), body]
+              = parens $ hang (text name <+> parens (text arg)) 1 body
 
 instance Display LetrecManyArgs where
     displayAlg (LetrecManyArgs bindings body)
@@ -109,7 +109,7 @@ instance Display LetrecManyArgs where
                        , body]
         where
           ppBinding (name, args, body)
-              = parens $ sep [text name, parens (sepMap text args), body]
+              = parens $ hang (text name <+> parens (sepMap text args)) 1 body
 
 sepMap :: (a -> Doc) -> [a] -> Doc
 sepMap f = sep . map f
