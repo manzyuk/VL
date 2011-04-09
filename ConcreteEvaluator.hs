@@ -16,6 +16,11 @@ import VL.Pretty
 import Control.Monad (forever)
 import System.IO
 
+-- The following meta-circular evaluator is not fully modular.  A more
+-- general class @EvalExpr@ would have a method @evalExpr@ of the type
+-- @(EvalExpr g) => f (Expr g) -> Env g -> Value g@, where @Env g@ and
+-- @Value g@ are environment and value types parametrized by the
+-- signature @g@ of the expression type.
 class EvalCoreExpr f where
     evalCoreExpr :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
 
