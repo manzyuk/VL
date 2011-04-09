@@ -304,7 +304,7 @@ instance ElimIf ConsStar where
 instance ElimIf If where
     elimIfAlg (If predicate consequent alternate)
         = mkApplicationManyArgs (mkVariable "#:if-procedure")
-                                [(thunk consequent), (thunk alternate)]
+                   [predicate, (thunk consequent), (thunk alternate)]
         where
           thunk e = mkLambdaManyArgs [] e
 
