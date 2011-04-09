@@ -15,8 +15,6 @@ import qualified VL.Environment as Environment
 import VL.Token (Token, scan)
 import qualified VL.Token as Token
 
-import VL.Pretty (pp, render)
-
 import Text.Parsec.Prim       hiding (many, (<|>), State, token, parse)
 import Text.Parsec.String     hiding (Parser)
 import Text.Parsec.Combinator (between)
