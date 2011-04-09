@@ -170,6 +170,7 @@ internal name contents = text "#[" <> sep [text name, contents] <> char ']'
 prim :: String -> Doc
 prim = internal "primitive" . text
 
+-- Pretty-printing of environments
 instance Pretty val => Pretty (Environment val) where
     pp = parens . sep . map ppBinding . Environment.bindings
         where
@@ -181,6 +182,7 @@ ppClosure env x b = internal "closure" $ pp env $+$ pp (mkLambdaOneArg x b)
 ppPair :: (Pretty a, Pretty b) => a -> b -> Doc
 ppPair x y = parens $ sep [pp x, dot, pp y]
 
+-- Pretty-printing of values
 instance Pretty ConcreteValue where
     pp (ConcreteScalar s)        = pp s
     pp (ConcreteClosure env x b) = ppClosure env x b
@@ -194,6 +196,7 @@ instance Pretty AbstractValue where
     pp (AbstractClosure env x b) = ppClosure env x b
     pp (AbstractPair v1 v2)      = ppPair v1 v2
 
+-- Pretty-printing of analyses
 instance Pretty AbstractAnalysis where
     pp analysis = internal "analysis" bindings
         where
