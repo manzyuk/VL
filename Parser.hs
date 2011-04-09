@@ -34,9 +34,14 @@ false = "#:false"
 -- names.
 type Parser = ParsecT [Token] () (State (ScalarEnvironment, Int))
 
+-- Accepts a token @t@ with the result @x@ when @test t@ is @Just x@.
+-- Like @token@ from Text.Parsec.Prim, but uses the default token
+-- pretty-printing function and ignores the position info.
 token :: (Token -> Maybe a) -> Parser a
 token test = tokenPrim show (\pos _ _ -> pos) test
 
+-- Accepts a token @t@ with the result @k@ when @t@ is the identifier
+-- @k@.
 symbol :: String -> Parser String
 symbol k = token maybeSymbol
     where
@@ -45,6 +50,7 @@ symbol k = token maybeSymbol
           | otherwise = Nothing
       maybeSymbol _   = Nothing
 
+-- Accepts the token @t@ with the result @t@.
 literate :: Token -> Parser Token
 literate t = token maybeLiterate
     where
@@ -56,6 +62,8 @@ lparen, rparen :: Parser Token
 lparen = literate Token.LParen
 rparen = literate Token.RParen
 
+-- Accepts a token @t@ with the result @n@ when @t@ is the identifier
+-- @n@ that is not a reserved keyword.
 identifier :: Parser Name
 identifier = token maybeIdentifier
     where
@@ -64,6 +72,7 @@ identifier = token maybeIdentifier
           | otherwise            = Nothing
       maybeIdentifier _          = Nothing
 
+-- The list of reserved keywords.
 keywords :: [String]
 keywords = [ "lambda"
            , "cons"
@@ -83,6 +92,8 @@ parseVariable = mkVariable <$> identifier
 parseConstant :: Parser SurfaceExpression
 parseConstant = do s <- try parseEmptyList <|> token maybeConstant
                    (env, i) <- get
+                   -- (), #t, #f are always converted to the same
+                   -- global names "#:nil", "#:true", "#:false".
                    let x = case s of
                              Scalar.Nil           -> nil
                              Scalar.Boolean True  -> true
@@ -98,11 +109,12 @@ parseConstant = do s <- try parseEmptyList <|> token maybeConstant
 parseEmptyList :: Parser Scalar
 parseEmptyList = Scalar.Nil <$ (lparen >> rparen)
 
-parens :: Parser a -> Parser a
-parens = between lparen rparen
-
+-- Helper combinators and aliases for better readability.
 special :: String -> Parser a -> Parser a
 special name body = symbol name *> body
+
+parens :: Parser a -> Parser a
+parens = between lparen rparen
 
 listOf :: Parser a -> Parser [a]
 listOf p = parens (many p)
@@ -113,6 +125,7 @@ args = listOf identifier
 body :: Parser SurfaceExpression
 body = expression
 
+-- Expression parsers.
 parseLambda
     = special "lambda"  $ liftA2 mkLambdaManyArgs args body
 parseCons
@@ -134,9 +147,9 @@ parseAnd
 parseCond
     = special "cond"    $ liftA  mkCond clauses
     where
-      clauses = many clause
-      clause  = parens  $ liftA2 (,) test expression
-      test    = expression
+      clauses  = many clause
+      clause   = parens $ liftA2 (,) test expression
+      test     = expression
 parseLet
     = special "let"     $ liftA2 mkLet bindings body
     where
