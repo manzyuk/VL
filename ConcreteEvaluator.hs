@@ -16,34 +16,34 @@ import VL.Pretty
 import Control.Monad (forever)
 import System.IO
 
-class Evaluate f where
-    evaluate :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
+class EvalExpr f where
+    evalExpr :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
 
 eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
-eval (In t) = evaluate t
+eval (In t) = evalExpr t
 
-instance Evaluate Variable where
-    evaluate (Variable x) env = Environment.lookup x env
+instance EvalExpr Variable where
+    evalExpr (Variable x) env = Environment.lookup x env
 
-instance Evaluate LambdaOneArg where
-    evaluate (LambdaOneArg arg body) env = ConcreteClosure env' arg body
+instance EvalExpr LambdaOneArg where
+    evalExpr (LambdaOneArg arg body) env = ConcreteClosure env' arg body
         where
           env' = Environment.restrict (freeVariables body) env
 
-instance Evaluate ApplicationOneArg where
-    evaluate (ApplicationOneArg operator operand) env
+instance EvalExpr ApplicationOneArg where
+    evalExpr (ApplicationOneArg operator operand) env
         = apply (eval operator env) (eval operand env)
 
-instance Evaluate Cons where
-    evaluate (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
+instance EvalExpr Cons where
+    evalExpr (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
 
-instance Evaluate LetrecOneArg where
-    evaluate (LetrecOneArg bindings body) env
+instance EvalExpr LetrecOneArg where
+    evalExpr (LetrecOneArg bindings body) env
         = eval (pushLetrec bindings body) env
 
-instance (Evaluate f, Evaluate g) => Evaluate (f :+: g) where
-    evaluate (Inl x) = evaluate x
-    evaluate (Inr x) = evaluate x
+instance (EvalExpr f, EvalExpr g) => EvalExpr (f :+: g) where
+    evalExpr (Inl x) = evalExpr x
+    evalExpr (Inr x) = evalExpr x
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
