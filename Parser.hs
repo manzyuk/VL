@@ -1,6 +1,8 @@
+{-# LANGUAGE TypeOperators #-}
 module VL.Parser where
 
 import VL.Common
+import VL.Coproduct
 
 import VL.Scalar (Scalar, ScalarEnvironment)
 import qualified VL.Scalar as Scalar
@@ -202,6 +204,77 @@ parseAndConvertConstants
             , (true,  Scalar.Boolean True )
             , (false, Scalar.Boolean False)
             ]
+
+-- Code transformations
+
+-- Elimination of derived conditionals (or, and, cond)
+
+type Stage1  =  Variable
+            :+: LambdaManyArgs
+            :+: ApplicationManyArgs
+            :+: Cons
+            :+: List
+            :+: ConsStar
+            :+: If
+            :+: Let
+            :+: LetrecManyArgs
+
+elimConditionals :: Expr Surface -> Expr Stage1
+elimConditionals = foldExpr elimConditionalsAlg
+
+class Functor f => ElimConditionals f where
+    elimConditionalsAlg :: f(Expr Stage1) -> Expr Stage1
+
+instance ElimConditionals Variable where
+    elimConditionalsAlg (Variable x) = mkVariable x
+
+instance ElimConditionals LambdaManyArgs where
+    elimConditionalsAlg (LambdaManyArgs args body)
+        = mkLambdaManyArgs args body
+
+instance ElimConditionals ApplicationManyArgs where
+    elimConditionalsAlg (ApplicationManyArgs operator operands)
+        = mkApplicationManyArgs operator operands
+
+instance ElimConditionals Cons where
+    elimConditionalsAlg (Cons x1 x2) = mkCons x1 x2
+
+instance ElimConditionals List where
+    elimConditionalsAlg (List xs) = mkList xs
+
+instance ElimConditionals ConsStar where
+    elimConditionalsAlg (ConsStar xs) = mkConsStar xs
+
+instance ElimConditionals If where
+    elimConditionalsAlg (If predicate consequent alternate)
+        = mkIf predicate consequent alternate
+
+instance ElimConditionals Or where
+    elimConditionalsAlg (Or xs) = foldr wrap (mkVariable false) xs
+        where
+          wrap x y = mkIf x (mkVariable true) y
+
+instance ElimConditionals And where
+    elimConditionalsAlg (And xs) = foldr wrap (mkVariable true) xs
+        where
+          wrap x y = mkIf x y (mkVariable false)
+
+instance ElimConditionals Cond where
+    elimConditionalsAlg (Cond clauses) = foldr wrap (mkVariable nil) clauses
+        where
+          wrap (t, e) e' = mkIf t e e'
+
+instance ElimConditionals Let where
+    elimConditionalsAlg (Let bindings body) = mkLet bindings body
+
+instance ElimConditionals LetrecManyArgs where
+    elimConditionalsAlg (LetrecManyArgs bindings body)
+        = mkLetrecManyArgs bindings body
+
+instance (Functor f, ElimConditionals f, Functor g, ElimConditionals g)
+    => ElimConditionals (f :+: g) where
+    elimConditionalsAlg (Inl x) = elimConditionalsAlg x
+    elimConditionalsAlg (Inr x) = elimConditionalsAlg x
 
 -- cdnr :: Int -> Expression binder -> Expression binder
 -- cdnr n = compose (replicate n cdr)
