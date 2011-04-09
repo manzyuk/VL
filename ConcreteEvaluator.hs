@@ -16,34 +16,34 @@ import VL.Pretty
 import Control.Monad (forever)
 import System.IO
 
-class EvalExpr f where
-    evalExpr :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
+class EvalCoreExpr f where
+    evalCoreExpr :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
 
 eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
-eval (In t) = evalExpr t
+eval (In t) = evalCoreExpr t
 
-instance EvalExpr Variable where
-    evalExpr (Variable x) env = Environment.lookup x env
+instance EvalCoreExpr Variable where
+    evalCoreExpr (Variable x) env = Environment.lookup x env
 
-instance EvalExpr LambdaOneArg where
-    evalExpr (LambdaOneArg arg body) env = ConcreteClosure env' arg body
+instance EvalCoreExpr LambdaOneArg where
+    evalCoreExpr (LambdaOneArg arg body) env = ConcreteClosure env' arg body
         where
           env' = Environment.restrict (freeVariables body) env
 
-instance EvalExpr ApplicationOneArg where
-    evalExpr (ApplicationOneArg operator operand) env
+instance EvalCoreExpr ApplicationOneArg where
+    evalCoreExpr (ApplicationOneArg operator operand) env
         = apply (eval operator env) (eval operand env)
 
-instance EvalExpr Cons where
-    evalExpr (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
+instance EvalCoreExpr Cons where
+    evalCoreExpr (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
 
-instance EvalExpr LetrecOneArg where
-    evalExpr (LetrecOneArg bindings body) env
+instance EvalCoreExpr LetrecOneArg where
+    evalCoreExpr (LetrecOneArg bindings body) env
         = eval (pushLetrec bindings body) env
 
-instance (EvalExpr f, EvalExpr g) => EvalExpr (f :+: g) where
-    evalExpr (Inl x) = evalExpr x
-    evalExpr (Inr x) = evalExpr x
+instance (EvalCoreExpr f, EvalCoreExpr g) => EvalCoreExpr (f :+: g) where
+    evalCoreExpr (Inl x) = evalCoreExpr x
+    evalCoreExpr (Inr x) = evalCoreExpr x
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
