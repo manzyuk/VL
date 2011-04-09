@@ -268,137 +268,138 @@ instance (FreeVariables f, FreeVariables g) => FreeVariables (f :+: g) where
     freeVariablesAlg (Inr x) = freeVariablesAlg x
 
 -- Equality of expressions
-class Eq' f where
-    isEqual :: Eq' g => f (Expr g) -> f (Expr g) -> Bool
+class EqFunctor f where
+    isEqual :: EqFunctor g => f (Expr g) -> f (Expr g) -> Bool
 
-instance Eq' f => Eq (Expr f) where
+instance EqFunctor f => Eq (Expr f) where
     (In t1) == (In t2) = t1 `isEqual` t2
 
-instance Eq' Variable where
+instance EqFunctor Variable where
     isEqual (Variable x1) (Variable x2) = x1 == x2
 
-instance Eq' LambdaOneArg where
+instance EqFunctor LambdaOneArg where
     isEqual (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
         = arg1 == arg2 && body1 == body2
 
-instance Eq' LambdaManyArgs where
+instance EqFunctor LambdaManyArgs where
     isEqual (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
         = args1 == args2 && body1 == body2
 
-instance Eq' ApplicationOneArg where
+instance EqFunctor ApplicationOneArg where
     isEqual (ApplicationOneArg operator1 operand1)
                 (ApplicationOneArg operator2 operand2)
         = operator1 == operator2 && operand1 == operand2
 
-instance Eq' ApplicationManyArgs where
+instance EqFunctor ApplicationManyArgs where
     isEqual (ApplicationManyArgs operator1 operands1)
                 (ApplicationManyArgs operator2 operands2)
         = operator1 == operator2 && operands1 == operands2
 
-instance Eq' Cons where
+instance EqFunctor Cons where
     isEqual (Cons x1 y1) (Cons x2 y2) = x1 == x2 && y1 == y2
 
-instance Eq' List where
+instance EqFunctor List where
     isEqual (List xs1) (List xs2) = xs1 == xs2
 
-instance Eq' ConsStar where
+instance EqFunctor ConsStar where
     isEqual (ConsStar xs1) (ConsStar xs2) = xs1 == xs2
 
-instance Eq' If where
+instance EqFunctor If where
     isEqual (If predicate1 consequent1 alternate1)
                 (If predicate2 consequent2 alternate2)
         = predicate1 == predicate2
                 && consequent1 == consequent2
                        && alternate1 == alternate2
 
-instance Eq' Or where
+instance EqFunctor Or where
     isEqual (Or xs1) (Or xs2) = xs1 == xs2
 
-instance Eq' And where
+instance EqFunctor And where
     isEqual (And xs1) (And xs2) = xs1 == xs2
 
-instance Eq' Cond where
+instance EqFunctor Cond where
     isEqual (Cond clauses1) (Cond clauses2) = clauses1 == clauses2
 
-instance Eq' Let where
+instance EqFunctor Let where
     isEqual (Let bindings1 body1) (Let bindings2 body2)
         = bindings1 == bindings2 && body1 == body2
 
-instance Eq' LetrecOneArg where
+instance EqFunctor LetrecOneArg where
     isEqual (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
         = bindings1 == bindings2 && body1 == body2
 
-instance Eq' LetrecManyArgs where
+instance EqFunctor LetrecManyArgs where
     isEqual (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
         = bindings1 == bindings2 && body1 == body2
 
-instance (Eq' f, Eq' g) => Eq' (f :+: g) where
+instance (EqFunctor f, EqFunctor g) => EqFunctor (f :+: g) where
     (Inl x) `isEqual` (Inl y) = x `isEqual` y
     (Inr x) `isEqual` (Inr y) = x `isEqual` y
     isEqual _ _               = False
 
 -- Ordering of expressions
-class Ord' f where
-    compare' :: (Eq' g, Ord' g) => f (Expr g) -> f (Expr g) -> Ordering
+class OrdFunctor f where
+    compare' :: (EqFunctor g, OrdFunctor g)
+             => f (Expr g) -> f (Expr g) -> Ordering
 
-instance (Eq' f, Ord' f) => Ord (Expr f) where
+instance (EqFunctor f, OrdFunctor f) => Ord (Expr f) where
     compare (In t1) (In t2) = compare' t1 t2
 
-instance Ord' Variable where
+instance OrdFunctor Variable where
     compare' (Variable x1) (Variable x2) = compare x1 x2
 
-instance Ord' LambdaOneArg where
+instance OrdFunctor LambdaOneArg where
     compare' (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
         = compare (arg1, body1) (arg2, body2)
 
-instance Ord' LambdaManyArgs where
+instance OrdFunctor LambdaManyArgs where
     compare' (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
         = compare (args1, body1) (args2, body2)
 
-instance Ord' ApplicationOneArg where
+instance OrdFunctor ApplicationOneArg where
     compare' (ApplicationOneArg operator1 operand1)
              (ApplicationOneArg operator2 operand2)
         = compare (operator1, operand1) (operator2, operand2)
 
-instance Ord' ApplicationManyArgs where
+instance OrdFunctor ApplicationManyArgs where
     compare' (ApplicationManyArgs operator1 operands1)
              (ApplicationManyArgs operator2 operands2)
         = compare (operator1, operands1) (operator2, operands2)
 
-instance Ord' Cons where
+instance OrdFunctor Cons where
     compare' (Cons x1 y1) (Cons x2 y2) = compare (x1, y1) (x2, y2)
 
-instance Ord' List where
+instance OrdFunctor List where
     compare' (List xs1) (List xs2) = compare xs1 xs2
 
-instance Ord' ConsStar where
+instance OrdFunctor ConsStar where
     compare' (ConsStar xs1) (ConsStar xs2) = compare xs1 xs2
 
-instance Ord' If where
+instance OrdFunctor If where
     compare' (If predicate1 consequent1 alternate1)
              (If predicate2 consequent2 alternate2)
         = compare (predicate1, consequent1, alternate1)
                   (predicate2, consequent2, alternate2)
 
-instance Ord' Or where
+instance OrdFunctor Or where
     compare' (Or xs1) (Or xs2) = compare xs1 xs2
 
-instance Ord' And where
+instance OrdFunctor And where
     compare' (And xs1) (And xs2) = compare xs1 xs2
 
-instance Ord' Let where
+instance OrdFunctor Let where
     compare' (Let bindings1 body1) (Let bindings2 body2)
         = compare (bindings1, body1) (bindings2, body2)
 
-instance Ord' LetrecOneArg where
+instance OrdFunctor LetrecOneArg where
     compare' (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
         = compare (bindings1, body1) (bindings2, body2)
 
-instance Ord' LetrecManyArgs where
+instance OrdFunctor LetrecManyArgs where
     compare' (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
         = compare (bindings1, body1) (bindings2, body2)
 
-instance (Ord' f, Ord' g) => Ord' (f :+: g) where
+instance (OrdFunctor f, OrdFunctor g) => OrdFunctor (f :+: g) where
     compare' (Inl x) (Inl y) = compare' x y
     compare' (Inr x) (Inr y) = compare' x y
     compare' (Inl x) (Inr y) = LT
