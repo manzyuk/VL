@@ -13,6 +13,9 @@ import VL.ConcreteValue
 import VL.Parser
 import VL.Pretty
 
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 import Control.Monad (forever)
 import System.IO
 
@@ -31,9 +34,11 @@ instance EvalCoreExpr Variable where
     evalCoreExpr (Variable x) env = Environment.lookup x env
 
 instance EvalCoreExpr LambdaOneArg where
-    evalCoreExpr (LambdaOneArg arg body) env = ConcreteClosure env' arg body
+    evalCoreExpr (LambdaOneArg arg body) env
+        = ConcreteClosure env' arg body
         where
-          env' = Environment.restrict (freeVariables body) env
+          fvs  = Set.delete arg (freeVariables body)
+          env' = Environment.restrict fvs env
 
 instance EvalCoreExpr ApplicationOneArg where
     evalCoreExpr (ApplicationOneArg operator operand) env
