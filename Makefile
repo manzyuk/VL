@@ -1,4 +1,4 @@
-.PHONY: test
+.PHONY: test clean
 test: Test.hs
 	ghc --make -O2 \
 		Test.hs \
@@ -16,3 +16,6 @@ test: Test.hs
 		ConcreteEvaluator.hs \
 		Coproduct.hs \
 	-threaded -o test && ./test
+
+clean:
+	rm test *.o *.hi
