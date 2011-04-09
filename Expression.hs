@@ -23,22 +23,6 @@ import qualified Data.Set as Set
 -- type LocalDefinition binder = (Name, binder, Expression binder)
 -- type CoreLocalDefinition = LocalDefinition Name
 
--- The evaluation rule for `letrec' is based on the following
--- trasformation from Reynolds's "Theories of Programming
--- Languages" (Section 11.3, p. 230):
---
--- letrec v1 = \u1. e1, ..., vn = \un. en in e
---   == (\v1. ... \vn. e) (\u1. e1*) ... (\un. en*)
---
--- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
--- transformLetrec :: [CoreLocalDefinition]
---                 -> CoreExpression
---                 -> CoreExpression
--- transformLetrec local_defs body = foldl Application f fs
---     where
---       vs = [v | (v, _, _) <- local_defs]
---       f  = foldr Lambda body vs
---       fs = [Lambda u (Letrec local_defs e) | (_, u, e) <- local_defs]
 
 -- type CoreExpression = Expression Name
 -- type SurfaceExpression = Expression [Name]
@@ -445,3 +429,19 @@ type Surface
       :+: LetrecManyArgs
 
 type SurfaceExpression = Expr Surface
+
+-- The evaluation rule for `letrec' is based on the following
+-- trasformation from Reynolds's "Theories of Programming
+-- Languages" (Section 11.3, p. 230):
+--
+-- letrec v1 = \u1. e1, ..., vn = \un. en in e
+--   == (\v1. ... \vn. e) (\u1. e1*) ... (\un. en*)
+--
+-- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
+pushLetrec :: (ApplicationOneArg :<: f, LambdaOneArg :<: f, LetrecOneArg :<: f)
+           => [(Name, Name, Expr f)] -> Expr f -> Expr f
+pushLetrec bindings body = foldl mkApplicationOneArg f fs
+    where
+      vs = [v | (v, _, _) <- bindings]
+      f  = foldr mkLambdaOneArg body vs
+      fs = [mkLambdaOneArg u (mkLetrecOneArg bindings e) | (_, u, e) <- bindings]
