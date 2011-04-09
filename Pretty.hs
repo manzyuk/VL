@@ -90,7 +90,8 @@ instance Display Let where
                        , body
                        ]
         where
-          ppBinding (name, expression) = parens $ sep [text name, expression]
+          ppBinding (name, expression)
+              = parens $ sep [text name, expression]
 
 instance Display LetrecOneArg where
     displayAlg (LetrecOneArg bindings body)
@@ -128,42 +129,43 @@ instance Pretty Scalar where
 
 -- Pretty-printing of primitives
 instance Pretty Primitive where
-    pp Car    = prim "car"
-    pp Cdr    = prim "cdr"
-    pp Add    = prim "+"
-    pp Sub    = prim "-"
-    pp Mul    = prim "*"
-    pp Div    = prim "/"
-    pp Eql    = prim "=="
-    pp Neq    = prim "/="
-    pp LTh    = prim "<"
-    pp LEq    = prim "<="
-    pp GTh    = prim ">"
-    pp GEq    = prim ">="
-    pp Exp    = prim "exp"
-    pp Log    = prim "log"
-    pp Pow    = prim "**"
-    pp Sin    = prim "sin"
-    pp Cos    = prim "cos"
-    pp Tan    = prim "tan"
-    pp Sqrt   = prim "sqrt"
-    pp Asin   = prim "asin"
-    pp Acos   = prim "acos"
-    pp Atan   = prim "atan"
-    pp Sinh   = prim "sinh"
-    pp Cosh   = prim "cosh"
-    pp Tanh   = prim "tanh"
-    pp Asinh  = prim "asinh"
-    pp Acosh  = prim "acosh"
-    pp Atanh  = prim "atanh"
-    pp Neg    = prim "negate"
-    pp IfProc = prim "if-procedure"
-    pp IsNull = prim "null?"
-    pp IsPair = prim "pair?"
-    pp IsReal = prim "real?"
+    pp Car       = prim "car"
+    pp Cdr       = prim "cdr"
+    pp Add       = prim "+"
+    pp Sub       = prim "-"
+    pp Mul       = prim "*"
+    pp Div       = prim "/"
+    pp Eql       = prim "=="
+    pp Neq       = prim "/="
+    pp LTh       = prim "<"
+    pp LEq       = prim "<="
+    pp GTh       = prim ">"
+    pp GEq       = prim ">="
+    pp Exp       = prim "exp"
+    pp Log       = prim "log"
+    pp Pow       = prim "**"
+    pp Sin       = prim "sin"
+    pp Cos       = prim "cos"
+    pp Tan       = prim "tan"
+    pp Sqrt      = prim "sqrt"
+    pp Asin      = prim "asin"
+    pp Acos      = prim "acos"
+    pp Atan      = prim "atan"
+    pp Sinh      = prim "sinh"
+    pp Cosh      = prim "cosh"
+    pp Tanh      = prim "tanh"
+    pp Asinh     = prim "asinh"
+    pp Acosh     = prim "acosh"
+    pp Atanh     = prim "atanh"
+    pp Neg       = prim "negate"
+    pp IfProc    = prim "if-procedure"
+    pp IsNull    = prim "null?"
+    pp IsPair    = prim "pair?"
+    pp IsReal    = prim "real?"
     pp IsBoolean = prim "boolean?"
     pp RealPrim  = prim "real"
 
+-- Helper combinator for pretty-printing internal objects
 internal :: String -> Doc -> Doc
 internal name contents = text "#[" <> sep [text name, contents] <> char ']'
 
