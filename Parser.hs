@@ -13,6 +13,8 @@ import qualified VL.Environment as Environment
 import VL.Token (Token, scan)
 import qualified VL.Token as Token
 
+import VL.Pretty (pp, render)
+
 import Text.Parsec.Prim       hiding (many, (<|>), State, parse)
 import Text.Parsec.String     hiding (Parser)
 import Text.Parsec.Combinator (between)
@@ -32,134 +34,129 @@ false = "#:false"
 -- names.
 type Parser = ParsecT [Token] () (State (ScalarEnvironment, Int))
 
--- @extract selector@ is a parser that consumes one token @t@ and
--- fails if @selector t@ is @Nothing@ or returns @x@ such that
--- @selector t == Just x@.
-extract :: (Token -> Maybe a) -> Parser a
-extract selector = tokenPrim show (\pos _ _ -> pos) selector
+pExtract :: (Token -> Maybe a) -> Parser a
+pExtract selector = tokenPrim show (\pos _ _ -> pos) selector
 
--- @keyword k@ is a parser that succeeds if the next token is an
--- identifier @k@ and returns @k@, or fails otherwise.
-keyword :: String -> Parser String
-keyword k = extract getKeyword
+pKeyword :: String -> Parser String
+pKeyword k = pExtract maybeKeyword
     where
-      getKeyword (Token.Identifier n)
+      maybeKeyword (Token.Identifier n)
           | k == n    = Just k
           | otherwise = Nothing
-      getKeyword _    = Nothing
+      maybeKeyword _  = Nothing
 
--- @literate t@ is a parser that succeeds if the next token is equal
--- to the supplied token @t@ and returns @t@, or fails otherwise.
-literate :: Token -> Parser Token
-literate t = extract getLiterate
+pLiterate :: Token -> Parser Token
+pLiterate t = pExtract maybeLiterate
     where
-      getLiterate x
+      maybeLiterate x
           | x == t    = Just x
           | otherwise = Nothing
 
--- @identifier@ is a parser that succeeds if the next token is an
--- identifier that is not a keyword and returns the name of that
--- identifier, or fails otherwise.
-identifier :: Parser Name
-identifier = extract getIdentifier
+pIdentifier :: Parser Name
+pIdentifier = pExtract maybeIdentifier
     where
-      getIdentifier (Token.Identifier x)
+      maybeIdentifier (Token.Identifier x)
           | x `notElem` keywords = Just x
           | otherwise            = Nothing
-      getIdentifier _            = Nothing
+      maybeIdentifier _          = Nothing
 
-variable :: Parser SurfaceExpression
-variable = Variable <$> identifier
+pVariable :: Parser SurfaceExpression
+pVariable = mkVariable <$> pIdentifier
 
 keywords :: [String]
-keywords = ["lambda", "cons", "list", "cons*", "if", "letrec"]
+keywords = ["lambda", "cons", "list", "cons*", "if", "or", "and", "cond", "let", "letrec"]
 
 -- @constant@ is a parser that consumes the next token and fails if it
 -- is not a constant; otherwise it generates a variable name and binds
 -- it to the constant in the environment.  The empty list and booleans
 -- are always bound to the same names.
-constant :: Parser SurfaceExpression
-constant = do s <- try emptyList <|> extract getConstant
-              (env, i) <- get
-              let x = case s of
-                        Scalar.Nil           -> nil
-                        Scalar.Boolean True  -> true
-                        Scalar.Boolean False -> false
-                        Scalar.Real _        -> "#:real-" ++ show i
-              put (Environment.update x s env, succ i)
-              return (Variable x)
+pConstant :: Parser SurfaceExpression
+pConstant = do s <- try pEmptyList <|> pExtract maybeConstant
+               (env, i) <- get
+               let x = case s of
+                         Scalar.Nil           -> nil
+                         Scalar.Boolean True  -> true
+                         Scalar.Boolean False -> false
+                         Scalar.Real _        -> "#:real-" ++ show i
+               put (Environment.update x s env, succ i)
+               return (mkVariable x)
     where
-      getConstant (Token.Boolean b) = Just (Scalar.Boolean b)
-      getConstant (Token.Real    r) = Just (Scalar.Real    r)
-      getConstant _                 = Nothing
+      maybeConstant (Token.Boolean b) = Just (Scalar.Boolean b)
+      maybeConstant (Token.Real    r) = Just (Scalar.Real    r)
+      maybeConstant _                 = Nothing
 
-emptyList :: Parser Scalar
-emptyList = Scalar.Nil <$ (literate Token.LParen >> literate Token.RParen)
+pEmptyList :: Parser Scalar
+pEmptyList = Scalar.Nil <$ (pLiterate Token.LParen >> pLiterate Token.RParen)
 
 parens :: Parser a -> Parser a
-parens = between (literate Token.LParen) (literate Token.RParen)
+parens = between (pLiterate Token.LParen) (pLiterate Token.RParen)
 
 special :: String -> Parser a -> Parser a
-special name body = keyword name *> body
+special name body = pKeyword name *> body
 
-lambda, cons, list, consStar, application :: Parser SurfaceExpression
-lambda      = special "lambda" $ liftA2 Lambda (parens (many identifier)) expression
-cons        = special "cons"   $ liftA2 Cons   expression                 expression
-list        = special "list"   $ expandList     <$> (many expression)
-consStar    = special "cons*"  $ expandConsStar <$> (many expression)
-application = liftA2 Application expression $ expandConsStar <$> (many expression)
+listOf :: Parser a -> Parser [a]
+listOf p = parens (many p)
 
-if_ :: Parser SurfaceExpression
-if_ = special "if" $ liftA3 ifProc expression expression expression
+pLambdaManyArgs = special "lambda"
+                $ liftA2 mkLambdaManyArgs (listOf pIdentifier) pExpression
+pCons           = special "cons"
+                $ liftA2 mkCons pExpression pExpression
+pList           = special "list"
+                $ liftA mkList (many pExpression)
+pConsStar       = special "cons*"
+                $ liftA mkConsStar (many pExpression)
+pIf             = special "if"
+                $ liftA3 mkIf pExpression pExpression pExpression
+pOr             = special "or"
+                $ liftA mkOr (many pExpression)
+pAnd            = special "and"
+                $ liftA mkAnd (many pExpression)
+pCond           = special "cond"
+                $ liftA mkCond (many pClause)
     where
-      ifProc c t e = Application (Variable "#:if-procedure")
-                   $ expandConsStar [c, thunk t, thunk e]
-      thunk b      = Lambda [] b
-
-let_ :: Parser SurfaceExpression
-let_ = special "let" $ liftA2 expandLet bindings expression
+      pClause = parens $ liftA2 (,) pExpression pExpression
+pLet            = special "let"
+                $ liftA2 mkLet (listOf pBinding) pExpression
     where
-      bindings = parens $ many binding
-      binding  = parens $ liftA2 (,) identifier expression
-      expandLet bs e = Application (Lambda xs e) (expandConsStar vs)
-          where
-            (xs, vs) = unzip bs
-
-letrec :: Parser SurfaceExpression
-letrec = special "letrec" $ liftA2 Letrec locals expression
+      pBinding = parens $ liftA2 (,) pIdentifier pExpression
+pLetrecManyArgs = special "letrec"
+                $ liftA2 mkLetrecManyArgs (listOf pBinding) pExpression
     where
-      local      = parens $ liftA3 (,,) identifier parameters expression
-      locals     = parens $ many local
-      parameters = parens $ many identifier
+      pBinding = parens $ liftA3 (,,) pIdentifier (listOf pIdentifier) pExpression
 
-expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
-expandList     = foldr  Cons (Variable nil)
-expandConsStar = foldr' Cons (Variable nil)
+pApplicationManyArgs = liftA2 mkApplicationManyArgs pExpression (many pExpression)
 
-foldr' :: (b -> b -> b) -> b -> [b] -> b
-foldr' step x0 []     = x0
-foldr' step x0 [x1]   = x1
-foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
+-- expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
+-- expandList     = foldr  Cons (Variable nil)
+-- expandConsStar = foldr' Cons (Variable nil)
 
-expression :: Parser SurfaceExpression
-expression = atom <|> form
+-- foldr' :: (b -> b -> b) -> b -> [b] -> b
+-- foldr' step x0 []     = x0
+-- foldr' step x0 [x1]   = x1
+-- foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
+
+pExpression :: Parser SurfaceExpression
+pExpression = pAtom <|> pForm
     where
-      atom = variable <|> constant
-      form = parens $
-                 try lambda
-             <|> try cons
-             <|> try list
-             <|> try consStar
-             <|> try if_
-             <|> try let_
-             <|> try letrec
-             <|> application
+      pAtom = pVariable <|> pConstant
+      pForm = parens $
+                 try pLambdaManyArgs
+             <|> try pCons
+             <|> try pList
+             <|> try pConsStar
+             <|> try pIf
+             <|> try pOr
+             <|> try pAnd
+             <|> try pCond
+             <|> try pLet
+             <|> try pLetrecManyArgs
+             <|> pApplicationManyArgs
 
 parseAndConvertConstants :: String -> (SurfaceExpression, ScalarEnvironment)
 parseAndConvertConstants
     = ((either (\_ -> error "parse error") id) *** fst)
     . flip runState (initialEnvironment, 0)
-    . runParserT expression () ""
+    . runParserT pExpression () ""
     . scan
     where
       initialEnvironment
@@ -169,57 +166,57 @@ parseAndConvertConstants
             , (false, Scalar.Boolean False)
             ]
 
-cdnr :: Int -> Expression binder -> Expression binder
-cdnr n = compose (replicate n cdr)
-    where
-      compose = foldr (.) id
-      cdr = Application (Variable "cdr")
+-- cdnr :: Int -> Expression binder -> Expression binder
+-- cdnr n = compose (replicate n cdr)
+--     where
+--       compose = foldr (.) id
+--       cdr = Application (Variable "cdr")
 
-cadnr :: Int -> Expression binder -> Expression binder
-cadnr n = car . cdnr n
-    where
-      car = Application (Variable "car")
+-- cadnr :: Int -> Expression binder -> Expression binder
+-- cadnr n = car . cdnr n
+--     where
+--       car = Application (Variable "car")
 
--- Transform every lambda that takes possibly many arguments into a
--- combination of lambdas that take only one argument, introducing
--- suitable argument destructuring.  In particular:
---
--- (lambda () e)
--- ~> (lambda (#:ignored) e)
---
--- and
---
--- (lambda (x1 x2) e)
--- ~> (lambda (#:args)
---      ((lambda (x1)
---         ((lambda (x2)
---            e)
---          (cdr #:args)))
---       (car #:args)))
-transform :: SurfaceExpression -> CoreExpression
-transform (Lambda []  b) = Lambda "#:ignored" (transform b)
-transform (Lambda [x] b) = Lambda x (transform b)
-transform (Lambda xs  b) = Lambda "#:args" b''
-    where
-      p   = Variable "#:args"
-      n   = length xs
-      xn  = last xs
-      b'  = Application (Lambda xn (transform b)) (cdnr (n-1) p)
-      b'' = foldr wrap b' (zip xs [0..n-2])
-      wrap (x, k) e = Application (Lambda x e) (cadnr k p)
-transform (Variable x) = Variable x
-transform (Application e1 e2)
-    = Application (transform e1) (transform e2)
-transform (Cons e1 e2)
-    = Cons (transform e1) (transform e2)
-transform (Letrec ls e)
-    = Letrec ls' e'
-    where
-      e'  = transform e
-      ls' = [ (name, x, b')
-            | (name, xs, b) <- ls
-            , let Lambda x b' = transform (Lambda xs b)
-            ]
+-- -- Transform every lambda that takes possibly many arguments into a
+-- -- combination of lambdas that take only one argument, introducing
+-- -- suitable argument destructuring.  In particular:
+-- --
+-- -- (lambda () e)
+-- -- ~> (lambda (#:ignored) e)
+-- --
+-- -- and
+-- --
+-- -- (lambda (x1 x2) e)
+-- -- ~> (lambda (#:args)
+-- --      ((lambda (x1)
+-- --         ((lambda (x2)
+-- --            e)
+-- --          (cdr #:args)))
+-- --       (car #:args)))
+-- transform :: SurfaceExpression -> CoreExpression
+-- transform (Lambda []  b) = Lambda "#:ignored" (transform b)
+-- transform (Lambda [x] b) = Lambda x (transform b)
+-- transform (Lambda xs  b) = Lambda "#:args" b''
+--     where
+--       p   = Variable "#:args"
+--       n   = length xs
+--       xn  = last xs
+--       b'  = Application (Lambda xn (transform b)) (cdnr (n-1) p)
+--       b'' = foldr wrap b' (zip xs [0..n-2])
+--       wrap (x, k) e = Application (Lambda x e) (cadnr k p)
+-- transform (Variable x) = Variable x
+-- transform (Application e1 e2)
+--     = Application (transform e1) (transform e2)
+-- transform (Cons e1 e2)
+--     = Cons (transform e1) (transform e2)
+-- transform (Letrec ls e)
+--     = Letrec ls' e'
+--     where
+--       e'  = transform e
+--       ls' = [ (name, x, b')
+--             | (name, xs, b) <- ls
+--             , let Lambda x b' = transform (Lambda xs b)
+--             ]
 
-parse :: String -> (CoreExpression, ScalarEnvironment)
-parse = first transform . parseAndConvertConstants
+-- parse :: String -> (CoreExpression, ScalarEnvironment)
+-- parse = first transform . parseAndConvertConstants
