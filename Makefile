@@ -1,5 +1,5 @@
 .PHONY: test
-test: Test.o
+test: Test.hs
 	ghc --make -O2 \
 		Test.hs \
 		AbstractEvaluator.hs \
@@ -14,4 +14,5 @@ test: Test.o
 		ConcreteValue.hs \
 		Token.hs \
 		ConcreteEvaluator.hs \
+		Coproduct.hs \
 	-threaded -o test && ./test
