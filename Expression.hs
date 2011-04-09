@@ -2,128 +2,72 @@
 {-# LANGUAGE UndecidableInstances, IncoherentInstances      #-}
 {-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances    #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances            #-}
+{-# LANGUAGE StandaloneDeriving, DeriveFunctor              #-}
 module VL.Expression where
 
 import VL.Common
 import VL.Coproduct
 
-import Control.Arrow (second, (***))
-
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 
--- data Expression binder
---     = Variable Name
---     | Lambda binder (Expression binder)
---     | Application (Expression binder) (Expression binder)
---     | Cons (Expression binder) (Expression binder)
---     | Letrec [LocalDefinition binder] (Expression binder)
---       deriving (Eq, Ord, Show)
+newtype Expr f = In { out :: f (Expr f) }
 
--- type LocalDefinition binder = (Name, binder, Expression binder)
--- type CoreLocalDefinition = LocalDefinition Name
+-- StandaloneDeriving extension allows us to derive Eq and Ord
+-- instances for Expr f.  I've borrowed this idea from
+--
+-- http://mainisusuallyafunction.blogspot.com/2010/12/type-level-fix-and-generic-folds.html
+--
+-- See also
+--
+-- http://www.haskell.org/ghc/docs/6.12.2/html/users_guide/deriving.html#stand-alone-deriving
+--
+-- Thanks to DeriveFunctor extension we can get rid of another
+-- chunk of boilerplate.
 
-
--- type CoreExpression = Expression Name
--- type SurfaceExpression = Expression [Name]
-
--- freeVariables :: CoreExpression -> Set Name
--- freeVariables (Variable x) = Set.singleton x
--- freeVariables (Lambda x e) = Set.delete x (freeVariables e)
--- freeVariables (Application e1 e2)
---     = (freeVariables e1) `Set.union` (freeVariables e2)
--- freeVariables (Cons e1 e2)
---     = (freeVariables e1) `Set.union` (freeVariables e2)
--- freeVariables (Letrec ls e)
---     = ((freeVariables e) `Set.union` vs) \\ ns
---     where
---       ns = Set.fromList [n | (n, _, _) <- ls]
---       vs = Set.unions [Set.delete x (freeVariables e) | (_, x, e) <- ls]
-
---------------------------------------------------------------------------------
-
-data Expr f = In { out :: f (Expr f) }
+deriving instance (Eq  (f (Expr f))) => Eq  (Expr f)
+deriving instance (Ord (f (Expr f))) => Ord (Expr f)
 
 data Variable            a = Variable Name
+                             deriving (Eq, Ord, Functor)
 
 -- Lambda expressions
 data LambdaOneArg        a = LambdaOneArg Name a
+                             deriving (Eq, Ord, Functor)
 data LambdaManyArgs      a = LambdaManyArgs [Name] a
+                             deriving (Eq, Ord, Functor)
 
 -- Procedure calls
 data ApplicationOneArg   a = ApplicationOneArg a a
+                             deriving (Eq, Ord, Functor)
 data ApplicationManyArgs a = ApplicationManyArgs a [a]
+                             deriving (Eq, Ord, Functor)
 
 -- Pairs
 data Cons                a = Cons a a
+                             deriving (Eq, Ord, Functor)
 data List                a = List [a]
+                             deriving (Eq, Ord, Functor)
 data ConsStar            a = ConsStar [a]
+                             deriving (Eq, Ord, Functor)
 
 -- Conditionals
 data If                  a = If a a a
+                             deriving (Eq, Ord, Functor)
 data Or                  a = Or [a]
+                             deriving (Eq, Ord, Functor)
 data And                 a = And [a]
+                             deriving (Eq, Ord, Functor)
 data Cond                a = Cond [(a, a)]
+                             deriving (Eq, Ord, Functor)
 
 -- Binding constructs
 data Let                 a = Let [(Name, a)] a
+                             deriving (Eq, Ord, Functor)
 data LetrecOneArg        a = LetrecOneArg [(Name, Name, a)] a
+                             deriving (Eq, Ord, Functor)
 data LetrecManyArgs      a = LetrecManyArgs [(Name, [Name], a)] a
-
--- Functor instances
-instance Functor Variable where
-    fmap _ (Variable name) = Variable name
-
-instance Functor LambdaOneArg where
-    fmap f (LambdaOneArg arg body) = LambdaOneArg arg (f body)
-
-instance Functor LambdaManyArgs where
-    fmap f (LambdaManyArgs args body) = LambdaManyArgs args (f body)
-
-instance Functor ApplicationOneArg where
-    fmap f (ApplicationOneArg operator operand)
-        = ApplicationOneArg (f operator) (f operand)
-
-instance Functor ApplicationManyArgs where
-    fmap f (ApplicationManyArgs operator operands)
-         = ApplicationManyArgs (f operator) (map f operands)
-
-instance Functor Cons where
-    fmap f (Cons x1 x2) = Cons (f x1) (f x2)
-
-instance Functor List where
-    fmap f (List xs) = List (map f xs)
-
-instance Functor ConsStar where
-    fmap f (ConsStar xs) = ConsStar (map f xs)
-
-instance Functor If where
-    fmap f (If predicate consequent alternate)
-        = If (f predicate) (f consequent) (f alternate)
-
-instance Functor Or where
-    fmap f (Or xs) = Or (map f xs)
-
-instance Functor And where
-    fmap f (And xs) = And (map f xs)
-
-instance Functor Cond where
-    fmap f (Cond clauses) = Cond (map (f *** f) clauses)
-
-instance Functor Let where
-    fmap f (Let bindings body)
-        = Let (map (second f) bindings) (f body)
-
-instance Functor LetrecOneArg where
-    fmap f (LetrecOneArg bindings body)
-        = LetrecOneArg (map (third f) bindings) (f body)
-
-instance Functor LetrecManyArgs where
-    fmap f (LetrecManyArgs bindings body)
-        = LetrecManyArgs (map (third f) bindings) (f body)
-
-third :: (c1 -> c2) -> (a, b, c1) -> (a, b, c2)
-third f (x, y, z) = (x, y, f z)
+                             deriving (Eq, Ord, Functor)
 
 -- Folding over expressions
 foldExpr :: Functor f => (f a -> a) -> Expr f -> a
@@ -266,144 +210,6 @@ instance FreeVariables LetrecManyArgs where
 instance (FreeVariables f, FreeVariables g) => FreeVariables (f :+: g) where
     freeVariablesAlg (Inl x) = freeVariablesAlg x
     freeVariablesAlg (Inr x) = freeVariablesAlg x
-
--- Equality of expressions
-class EqFunctor f where
-    isEqual :: EqFunctor g => f (Expr g) -> f (Expr g) -> Bool
-
-instance EqFunctor f => Eq (Expr f) where
-    (In t1) == (In t2) = t1 `isEqual` t2
-
-instance EqFunctor Variable where
-    isEqual (Variable x1) (Variable x2) = x1 == x2
-
-instance EqFunctor LambdaOneArg where
-    isEqual (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
-        = arg1 == arg2 && body1 == body2
-
-instance EqFunctor LambdaManyArgs where
-    isEqual (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
-        = args1 == args2 && body1 == body2
-
-instance EqFunctor ApplicationOneArg where
-    isEqual (ApplicationOneArg operator1 operand1)
-                (ApplicationOneArg operator2 operand2)
-        = operator1 == operator2 && operand1 == operand2
-
-instance EqFunctor ApplicationManyArgs where
-    isEqual (ApplicationManyArgs operator1 operands1)
-                (ApplicationManyArgs operator2 operands2)
-        = operator1 == operator2 && operands1 == operands2
-
-instance EqFunctor Cons where
-    isEqual (Cons x1 y1) (Cons x2 y2) = x1 == x2 && y1 == y2
-
-instance EqFunctor List where
-    isEqual (List xs1) (List xs2) = xs1 == xs2
-
-instance EqFunctor ConsStar where
-    isEqual (ConsStar xs1) (ConsStar xs2) = xs1 == xs2
-
-instance EqFunctor If where
-    isEqual (If predicate1 consequent1 alternate1)
-                (If predicate2 consequent2 alternate2)
-        = predicate1 == predicate2
-                && consequent1 == consequent2
-                       && alternate1 == alternate2
-
-instance EqFunctor Or where
-    isEqual (Or xs1) (Or xs2) = xs1 == xs2
-
-instance EqFunctor And where
-    isEqual (And xs1) (And xs2) = xs1 == xs2
-
-instance EqFunctor Cond where
-    isEqual (Cond clauses1) (Cond clauses2) = clauses1 == clauses2
-
-instance EqFunctor Let where
-    isEqual (Let bindings1 body1) (Let bindings2 body2)
-        = bindings1 == bindings2 && body1 == body2
-
-instance EqFunctor LetrecOneArg where
-    isEqual (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
-        = bindings1 == bindings2 && body1 == body2
-
-instance EqFunctor LetrecManyArgs where
-    isEqual (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
-        = bindings1 == bindings2 && body1 == body2
-
-instance (EqFunctor f, EqFunctor g) => EqFunctor (f :+: g) where
-    (Inl x) `isEqual` (Inl y) = x `isEqual` y
-    (Inr x) `isEqual` (Inr y) = x `isEqual` y
-    isEqual _ _               = False
-
--- Ordering of expressions
-class OrdFunctor f where
-    compare' :: (EqFunctor g, OrdFunctor g)
-             => f (Expr g) -> f (Expr g) -> Ordering
-
-instance (EqFunctor f, OrdFunctor f) => Ord (Expr f) where
-    compare (In t1) (In t2) = compare' t1 t2
-
-instance OrdFunctor Variable where
-    compare' (Variable x1) (Variable x2) = compare x1 x2
-
-instance OrdFunctor LambdaOneArg where
-    compare' (LambdaOneArg arg1 body1) (LambdaOneArg arg2 body2)
-        = compare (arg1, body1) (arg2, body2)
-
-instance OrdFunctor LambdaManyArgs where
-    compare' (LambdaManyArgs args1 body1) (LambdaManyArgs args2 body2)
-        = compare (args1, body1) (args2, body2)
-
-instance OrdFunctor ApplicationOneArg where
-    compare' (ApplicationOneArg operator1 operand1)
-             (ApplicationOneArg operator2 operand2)
-        = compare (operator1, operand1) (operator2, operand2)
-
-instance OrdFunctor ApplicationManyArgs where
-    compare' (ApplicationManyArgs operator1 operands1)
-             (ApplicationManyArgs operator2 operands2)
-        = compare (operator1, operands1) (operator2, operands2)
-
-instance OrdFunctor Cons where
-    compare' (Cons x1 y1) (Cons x2 y2) = compare (x1, y1) (x2, y2)
-
-instance OrdFunctor List where
-    compare' (List xs1) (List xs2) = compare xs1 xs2
-
-instance OrdFunctor ConsStar where
-    compare' (ConsStar xs1) (ConsStar xs2) = compare xs1 xs2
-
-instance OrdFunctor If where
-    compare' (If predicate1 consequent1 alternate1)
-             (If predicate2 consequent2 alternate2)
-        = compare (predicate1, consequent1, alternate1)
-                  (predicate2, consequent2, alternate2)
-
-instance OrdFunctor Or where
-    compare' (Or xs1) (Or xs2) = compare xs1 xs2
-
-instance OrdFunctor And where
-    compare' (And xs1) (And xs2) = compare xs1 xs2
-
-instance OrdFunctor Let where
-    compare' (Let bindings1 body1) (Let bindings2 body2)
-        = compare (bindings1, body1) (bindings2, body2)
-
-instance OrdFunctor LetrecOneArg where
-    compare' (LetrecOneArg bindings1 body1) (LetrecOneArg bindings2 body2)
-        = compare (bindings1, body1) (bindings2, body2)
-
-instance OrdFunctor LetrecManyArgs where
-    compare' (LetrecManyArgs bindings1 body1) (LetrecManyArgs bindings2 body2)
-        = compare (bindings1, body1) (bindings2, body2)
-
-instance (OrdFunctor f, OrdFunctor g) => OrdFunctor (f :+: g) where
-    compare' (Inl x) (Inl y) = compare' x y
-    compare' (Inr x) (Inr y) = compare' x y
-    compare' (Inl x) (Inr y) = LT
-    compare' (Inr x) (Inl y) = GT
 
 -- Type synonyms for the most important expression types
 type Core
