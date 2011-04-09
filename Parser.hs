@@ -165,15 +165,6 @@ parseLetrec
 
 parseApplication = liftA2 mkApplicationManyArgs expression (many expression)
 
--- expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
--- expandList     = foldr  Cons (Variable nil)
--- expandConsStar = foldr' Cons (Variable nil)
-
--- foldr' :: (b -> b -> b) -> b -> [b] -> b
--- foldr' step x0 []     = x0
--- foldr' step x0 [x1]   = x1
--- foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
-
 expression :: Parser SurfaceExpression
 expression = atom <|> list
     where
@@ -467,5 +458,51 @@ instance (Functor f, ElimManyArgs f, Functor g, ElimManyArgs g) =>
         elimManyArgsAlg (Inl x) = elimManyArgsAlg x
         elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
--- parse :: String -> (CoreExpression, ScalarEnvironment)
--- parse = first transform . parseAndConvertConstants
+-- Elimination of `list' and `cons*'
+elimList :: Expr Stage4 -> Expr Core
+elimList = foldExpr elimListAlg
+
+class Functor f => ElimList f where
+    elimListAlg :: f (Expr Core) -> Expr Core
+
+instance ElimList Variable where
+    elimListAlg (Variable x) = mkVariable x
+
+instance ElimList LambdaOneArg where
+    elimListAlg (LambdaOneArg arg body) = mkLambdaOneArg arg body
+
+instance ElimList ApplicationOneArg where
+    elimListAlg (ApplicationOneArg operator operand)
+        = mkApplicationOneArg operator operand
+
+instance ElimList Cons where
+    elimListAlg (Cons x y) = mkCons x y
+
+instance ElimList List where
+    elimListAlg (List xs) = foldr mkCons (mkVariable nil) xs
+
+instance ElimList ConsStar where
+    elimListAlg (ConsStar xs) = foldr' mkCons (mkVariable nil) xs
+
+foldr' :: (b -> b -> b) -> b -> [b] -> b
+foldr' step x0 []     = x0
+foldr' step x0 [x1]   = x1
+foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
+
+instance ElimList LetrecOneArg where
+    elimListAlg (LetrecOneArg bindings body) = mkLetrecOneArg bindings body
+
+instance (Functor f, ElimList f, Functor g, ElimList g) =>
+    ElimList (f :+: g) where
+        elimListAlg (Inl x) = elimListAlg x
+        elimListAlg (Inr x) = elimListAlg x
+
+macroexpand :: SurfaceExpression -> CoreExpression
+macroexpand = elimList
+            . elimManyArgs
+            . elimLet
+            . elimIf
+            . elimConditionals
+
+parse :: String -> (CoreExpression, ScalarEnvironment)
+parse = first macroexpand . parseAndConvertConstants
