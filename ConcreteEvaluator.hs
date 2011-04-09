@@ -1,6 +1,8 @@
+{-# LANGUAGE TypeOperators #-}
 module VL.ConcreteEvaluator where
 
 import VL.Scalar
+import VL.Coproduct
 import VL.Expression
 
 import VL.Environment (Environment)
@@ -14,15 +16,34 @@ import VL.Pretty
 import Control.Monad (forever)
 import System.IO
 
+class Evaluate f where
+    evaluate :: f CoreExpression -> ConcreteEnvironment -> ConcreteValue
+
 eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
-eval (Variable x)        env = Environment.lookup x env
-eval e@(Lambda x b)      env = ConcreteClosure env' x b
-    where
-      env' = Environment.restrict (freeVariables e) env
-eval (Application e1 e2) env = apply (eval e1 env) (eval e2 env)
-eval (Cons e1 e2)        env = ConcretePair (eval e1 env) (eval e2 env)
-eval (Letrec local_defs body) env
-    = eval (transformLetrec local_defs body) env
+eval (In t) = evaluate t
+
+instance Evaluate Variable where
+    evaluate (Variable x) env = Environment.lookup x env
+
+instance Evaluate LambdaOneArg where
+    evaluate (LambdaOneArg arg body) env = ConcreteClosure env' arg body
+        where
+          env' = Environment.restrict (freeVariables body) env
+
+instance Evaluate ApplicationOneArg where
+    evaluate (ApplicationOneArg operator operand) env
+        = apply (eval operator env) (eval operand env)
+
+instance Evaluate Cons where
+    evaluate (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
+
+instance Evaluate LetrecOneArg where
+    evaluate (LetrecOneArg bindings body) env
+        = eval (pushLetrec bindings body) env
+
+instance (Evaluate f, Evaluate g) => Evaluate (f :+: g) where
+    evaluate (Inl x) = evaluate x
+    evaluate (Inr x) = evaluate x
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
@@ -102,6 +123,7 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
+primIfProc v = error $ "Malformed IF expression: " ++ (render (pp v))
 
 predicate :: (ConcreteValue -> Bool) -> ConcreteValue -> ConcreteValue
 predicate p = ConcreteScalar . Boolean . p
