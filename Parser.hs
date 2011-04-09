@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators, FlexibleContexts #-}
 module VL.Parser where
 
 import VL.Common
@@ -270,10 +270,10 @@ instance ElimConditionals LetrecManyArgs where
     elimConditionalsAlg (LetrecManyArgs bindings body)
         = mkLetrecManyArgs bindings body
 
-instance (Functor f, ElimConditionals f, Functor g, ElimConditionals g)
-    => ElimConditionals (f :+: g) where
-    elimConditionalsAlg (Inl x) = elimConditionalsAlg x
-    elimConditionalsAlg (Inr x) = elimConditionalsAlg x
+instance (Functor f, ElimConditionals f, Functor g, ElimConditionals g) =>
+    ElimConditionals (f :+: g) where
+        elimConditionalsAlg (Inl x) = elimConditionalsAlg x
+        elimConditionalsAlg (Inr x) = elimConditionalsAlg x
 
 -- Elimination of `if'
 type Stage2  =  Variable
@@ -376,33 +376,97 @@ instance (Functor f, ElimLet f, Functor g, ElimLet g) => ElimLet (f :+: g) where
     elimLetAlg (Inl x) = elimLetAlg x
     elimLetAlg (Inr x) = elimLetAlg x
 
--- cdnr :: Int -> Expression binder -> Expression binder
--- cdnr n = compose (replicate n cdr)
---     where
---       compose = foldr (.) id
---       cdr = Application (Variable "cdr")
+-- Elimination of many arguments (in lambdas, applications, and letrec bindings)
+type Stage4  =  Variable
+            :+: LambdaOneArg
+            :+: ApplicationOneArg
+            :+: Cons
+            :+: List
+            :+: ConsStar
+            :+: LetrecOneArg
 
--- cadnr :: Int -> Expression binder -> Expression binder
--- cadnr n = car . cdnr n
---     where
---       car = Application (Variable "car")
+elimManyArgs :: Expr Stage3 -> Expr Stage4
+elimManyArgs = foldExpr elimManyArgsAlg
 
--- -- Transform every lambda that takes possibly many arguments into a
--- -- combination of lambdas that take only one argument, introducing
--- -- suitable argument destructuring.  In particular:
--- --
--- -- (lambda () e)
--- -- ~> (lambda (#:ignored) e)
--- --
--- -- and
--- --
--- -- (lambda (x1 x2) e)
--- -- ~> (lambda (#:args)
--- --      ((lambda (x1)
--- --         ((lambda (x2)
--- --            e)
--- --          (cdr #:args)))
--- --       (car #:args)))
+class Functor f => ElimManyArgs f where
+    elimManyArgsAlg :: f (Expr Stage4) -> Expr Stage4
+
+instance ElimManyArgs Variable where
+    elimManyArgsAlg (Variable x) = mkVariable x
+
+instance ElimManyArgs LambdaManyArgs where
+    elimManyArgsAlg (LambdaManyArgs args body)
+        = mkLambdaOneArg arg body'
+        where
+          (arg, body') = nestLambdas args body
+
+-- Transform a lambda that takes possibly many arguments into a
+-- combination of nested lambdas that take only one argument,
+-- introducing suitable argument destructuring.  In particular:
+--
+-- (lambda () e)
+-- ~> (lambda (#:ignored) e)
+--
+-- and
+--
+-- (lambda (x1 x2) e)
+-- ~> (lambda (#:args)
+--      ((lambda (x1)
+--         ((lambda (x2)
+--            e)
+--          (cdr #:args)))
+--       (car #:args)))
+nestLambdas :: [Name] -> Expr Stage4 -> (Name, Expr Stage4)
+nestLambdas []    body = ("#:ignored", body)
+nestLambdas [arg] body = (arg, body)
+nestLambdas args  body = ("#:args", body'')
+    where
+      p             = mkVariable "#:args"
+      n             = length args
+      argn          = last args
+      body'         = with argn (cdnr (n-1) p) body
+      body''        = foldr wrap body' (zip args [0..n-2])
+      wrap (x, k) e = with x (cadnr k p) e
+      with x v e    = mkApplicationOneArg (mkLambdaOneArg x e) v
+
+cdnr, cadnr :: (ApplicationOneArg :<: f, Variable :<: f)
+            => Int -> Expr f -> Expr f
+cdnr n = compose (replicate n cdr)
+    where
+      compose = foldr (.) id
+      cdr = mkApplicationOneArg (mkVariable "cdr")
+
+cadnr n = car . cdnr n
+    where
+      car = mkApplicationOneArg (mkVariable "car")
+
+instance ElimManyArgs ApplicationManyArgs where
+    elimManyArgsAlg (ApplicationManyArgs operator operands)
+        = mkApplicationOneArg operator (mkConsStar operands)
+
+instance ElimManyArgs Cons where
+    elimManyArgsAlg (Cons x y) = mkCons x y
+
+instance ElimManyArgs List where
+    elimManyArgsAlg (List xs) = mkList xs
+
+instance ElimManyArgs ConsStar where
+    elimManyArgsAlg (ConsStar xs) = mkConsStar xs
+
+instance ElimManyArgs LetrecManyArgs where
+    elimManyArgsAlg (LetrecManyArgs bindings body)
+        = mkLetrecOneArg bindings' body
+        where
+          bindings' = [ (name, arg, e')
+                      | (name, args, e) <- bindings
+                      , let (arg, e') = nestLambdas args e
+                      ]
+
+instance (Functor f, ElimManyArgs f, Functor g, ElimManyArgs g) =>
+    ElimManyArgs (f :+: g) where
+        elimManyArgsAlg (Inl x) = elimManyArgsAlg x
+        elimManyArgsAlg (Inr x) = elimManyArgsAlg x
+
 -- transform :: SurfaceExpression -> CoreExpression
 -- transform (Lambda []  b) = Lambda "#:ignored" (transform b)
 -- transform (Lambda [x] b) = Lambda x (transform b)
