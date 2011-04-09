@@ -15,7 +15,7 @@ import qualified VL.Token as Token
 
 import VL.Pretty (pp, render)
 
-import Text.Parsec.Prim       hiding (many, (<|>), State, parse)
+import Text.Parsec.Prim       hiding (many, (<|>), State, token, parse)
 import Text.Parsec.String     hiding (Parser)
 import Text.Parsec.Combinator (between)
 
@@ -34,97 +34,121 @@ false = "#:false"
 -- names.
 type Parser = ParsecT [Token] () (State (ScalarEnvironment, Int))
 
-pExtract :: (Token -> Maybe a) -> Parser a
-pExtract selector = tokenPrim show (\pos _ _ -> pos) selector
+token :: (Token -> Maybe a) -> Parser a
+token test = tokenPrim show (\pos _ _ -> pos) test
 
-pKeyword :: String -> Parser String
-pKeyword k = pExtract maybeKeyword
+symbol :: String -> Parser String
+symbol k = token maybeSymbol
     where
-      maybeKeyword (Token.Identifier n)
+      maybeSymbol (Token.Identifier n)
           | k == n    = Just k
           | otherwise = Nothing
-      maybeKeyword _  = Nothing
+      maybeSymbol _   = Nothing
 
-pLiterate :: Token -> Parser Token
-pLiterate t = pExtract maybeLiterate
+literate :: Token -> Parser Token
+literate t = token maybeLiterate
     where
       maybeLiterate x
           | x == t    = Just x
           | otherwise = Nothing
 
-pIdentifier :: Parser Name
-pIdentifier = pExtract maybeIdentifier
+lparen, rparen :: Parser Token
+lparen = literate Token.LParen
+rparen = literate Token.RParen
+
+identifier :: Parser Name
+identifier = token maybeIdentifier
     where
       maybeIdentifier (Token.Identifier x)
           | x `notElem` keywords = Just x
           | otherwise            = Nothing
       maybeIdentifier _          = Nothing
 
-pVariable :: Parser SurfaceExpression
-pVariable = mkVariable <$> pIdentifier
-
 keywords :: [String]
-keywords = ["lambda", "cons", "list", "cons*", "if", "or", "and", "cond", "let", "letrec"]
+keywords = [ "lambda"
+           , "cons"
+           , "list"
+           , "cons*"
+           , "if"
+           , "or"
+           , "and"
+           , "cond"
+           , "let"
+           , "letrec"
+           ]
 
--- @constant@ is a parser that consumes the next token and fails if it
--- is not a constant; otherwise it generates a variable name and binds
--- it to the constant in the environment.  The empty list and booleans
--- are always bound to the same names.
-pConstant :: Parser SurfaceExpression
-pConstant = do s <- try pEmptyList <|> pExtract maybeConstant
-               (env, i) <- get
-               let x = case s of
-                         Scalar.Nil           -> nil
-                         Scalar.Boolean True  -> true
-                         Scalar.Boolean False -> false
-                         Scalar.Real _        -> "#:real-" ++ show i
-               put (Environment.update x s env, succ i)
-               return (mkVariable x)
+parseVariable :: Parser SurfaceExpression
+parseVariable = mkVariable <$> identifier
+
+parseConstant :: Parser SurfaceExpression
+parseConstant = do s <- try parseEmptyList <|> token maybeConstant
+                   (env, i) <- get
+                   let x = case s of
+                             Scalar.Nil           -> nil
+                             Scalar.Boolean True  -> true
+                             Scalar.Boolean False -> false
+                             Scalar.Real _        -> "#:real-" ++ show i
+                   put (Environment.update x s env, succ i)
+                   return (mkVariable x)
     where
       maybeConstant (Token.Boolean b) = Just (Scalar.Boolean b)
       maybeConstant (Token.Real    r) = Just (Scalar.Real    r)
       maybeConstant _                 = Nothing
 
-pEmptyList :: Parser Scalar
-pEmptyList = Scalar.Nil <$ (pLiterate Token.LParen >> pLiterate Token.RParen)
+parseEmptyList :: Parser Scalar
+parseEmptyList = Scalar.Nil <$ (lparen >> rparen)
 
 parens :: Parser a -> Parser a
-parens = between (pLiterate Token.LParen) (pLiterate Token.RParen)
+parens = between lparen rparen
 
 special :: String -> Parser a -> Parser a
-special name body = pKeyword name *> body
+special name body = symbol name *> body
 
 listOf :: Parser a -> Parser [a]
 listOf p = parens (many p)
 
-pLambdaManyArgs = special "lambda"
-                $ liftA2 mkLambdaManyArgs (listOf pIdentifier) pExpression
-pCons           = special "cons"
-                $ liftA2 mkCons pExpression pExpression
-pList           = special "list"
-                $ liftA mkList (many pExpression)
-pConsStar       = special "cons*"
-                $ liftA mkConsStar (many pExpression)
-pIf             = special "if"
-                $ liftA3 mkIf pExpression pExpression pExpression
-pOr             = special "or"
-                $ liftA mkOr (many pExpression)
-pAnd            = special "and"
-                $ liftA mkAnd (many pExpression)
-pCond           = special "cond"
-                $ liftA mkCond (many pClause)
-    where
-      pClause = parens $ liftA2 (,) pExpression pExpression
-pLet            = special "let"
-                $ liftA2 mkLet (listOf pBinding) pExpression
-    where
-      pBinding = parens $ liftA2 (,) pIdentifier pExpression
-pLetrecManyArgs = special "letrec"
-                $ liftA2 mkLetrecManyArgs (listOf pBinding) pExpression
-    where
-      pBinding = parens $ liftA3 (,,) pIdentifier (listOf pIdentifier) pExpression
+args :: Parser [Name]
+args = listOf identifier
 
-pApplicationManyArgs = liftA2 mkApplicationManyArgs pExpression (many pExpression)
+body :: Parser SurfaceExpression
+body = expression
+
+parseLambda
+    = special "lambda"  $ liftA2 mkLambdaManyArgs args body
+parseCons
+    = special "cons"    $ liftA2 mkCons expression expression
+parseList
+    = special "list"    $ liftA  mkList (many expression)
+parseConsStar
+    = special "cons*"   $ liftA  mkConsStar (many expression)
+parseIf
+    = special "if"      $ liftA3 mkIf predicate consequent alternate
+    where
+      predicate  = expression
+      consequent = expression
+      alternate  = expression
+parseOr
+    = special "or"      $ liftA  mkOr (many expression)
+parseAnd
+    = special "and"     $ liftA  mkAnd (many expression)
+parseCond
+    = special "cond"    $ liftA  mkCond clauses
+    where
+      clauses = many clause
+      clause  = parens  $ liftA2 (,) test expression
+      test    = expression
+parseLet
+    = special "let"     $ liftA2 mkLet bindings body
+    where
+      bindings = listOf binding
+      binding  = parens $ liftA2 (,) identifier expression
+parseLetrec
+    = special "letrec"  $ liftA2 mkLetrecManyArgs bindings body
+    where
+      bindings = listOf binding
+      binding  = parens $ liftA3 (,,) identifier args body
+
+parseApplication = liftA2 mkApplicationManyArgs expression (many expression)
 
 -- expandList, expandConsStar :: [SurfaceExpression] -> SurfaceExpression
 -- expandList     = foldr  Cons (Variable nil)
@@ -135,28 +159,28 @@ pApplicationManyArgs = liftA2 mkApplicationManyArgs pExpression (many pExpressio
 -- foldr' step x0 [x1]   = x1
 -- foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
 
-pExpression :: Parser SurfaceExpression
-pExpression = pAtom <|> pForm
+expression :: Parser SurfaceExpression
+expression = atom <|> list
     where
-      pAtom = pVariable <|> pConstant
-      pForm = parens $
-                 try pLambdaManyArgs
-             <|> try pCons
-             <|> try pList
-             <|> try pConsStar
-             <|> try pIf
-             <|> try pOr
-             <|> try pAnd
-             <|> try pCond
-             <|> try pLet
-             <|> try pLetrecManyArgs
-             <|> pApplicationManyArgs
+      atom = parseVariable <|> parseConstant
+      list = parens $
+                 try parseLambda
+             <|> try parseCons
+             <|> try parseList
+             <|> try parseConsStar
+             <|> try parseIf
+             <|> try parseOr
+             <|> try parseAnd
+             <|> try parseCond
+             <|> try parseLet
+             <|> try parseLetrec
+             <|> parseApplication
 
 parseAndConvertConstants :: String -> (SurfaceExpression, ScalarEnvironment)
 parseAndConvertConstants
     = ((either (\_ -> error "parse error") id) *** fst)
     . flip runState (initialEnvironment, 0)
-    . runParserT pExpression () ""
+    . runParserT expression () ""
     . scan
     where
       initialEnvironment
