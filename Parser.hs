@@ -261,7 +261,7 @@ instance ElimConditionals LetrecManyArgs where
     elimConditionalsAlg (LetrecManyArgs bindings body)
         = mkLetrecManyArgs bindings body
 
-instance (Functor f, ElimConditionals f, Functor g, ElimConditionals g) =>
+instance (ElimConditionals f, ElimConditionals g) =>
     ElimConditionals (f :+: g) where
         elimConditionalsAlg (Inl x) = elimConditionalsAlg x
         elimConditionalsAlg (Inr x) = elimConditionalsAlg x
@@ -315,7 +315,7 @@ instance ElimIf LetrecManyArgs where
     elimIfAlg (LetrecManyArgs bindings body)
         = mkLetrecManyArgs bindings body
 
-instance (Functor f, ElimIf f, Functor g, ElimIf g) => ElimIf (f :+: g) where
+instance (ElimIf f, ElimIf g) => ElimIf (f :+: g) where
     elimIfAlg (Inl x) = elimIfAlg x
     elimIfAlg (Inr x) = elimIfAlg x
 
@@ -363,7 +363,7 @@ instance ElimLet LetrecManyArgs where
     elimLetAlg (LetrecManyArgs bindings body)
         = mkLetrecManyArgs bindings body
 
-instance (Functor f, ElimLet f, Functor g, ElimLet g) => ElimLet (f :+: g) where
+instance (ElimLet f, ElimLet g) => ElimLet (f :+: g) where
     elimLetAlg (Inl x) = elimLetAlg x
     elimLetAlg (Inr x) = elimLetAlg x
 
@@ -453,8 +453,7 @@ instance ElimManyArgs LetrecManyArgs where
                       , let (arg, e') = nestLambdas args e
                       ]
 
-instance (Functor f, ElimManyArgs f, Functor g, ElimManyArgs g) =>
-    ElimManyArgs (f :+: g) where
+instance (ElimManyArgs f, ElimManyArgs g) => ElimManyArgs (f :+: g) where
         elimManyArgsAlg (Inl x) = elimManyArgsAlg x
         elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
@@ -492,8 +491,7 @@ foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
 instance ElimList LetrecOneArg where
     elimListAlg (LetrecOneArg bindings body) = mkLetrecOneArg bindings body
 
-instance (Functor f, ElimList f, Functor g, ElimList g) =>
-    ElimList (f :+: g) where
+instance (ElimList f, ElimList g) => ElimList (f :+: g) where
         elimListAlg (Inl x) = elimListAlg x
         elimListAlg (Inr x) = elimListAlg x
 
