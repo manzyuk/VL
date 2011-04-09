@@ -454,8 +454,8 @@ instance ElimManyArgs LetrecManyArgs where
                       ]
 
 instance (ElimManyArgs f, ElimManyArgs g) => ElimManyArgs (f :+: g) where
-        elimManyArgsAlg (Inl x) = elimManyArgsAlg x
-        elimManyArgsAlg (Inr x) = elimManyArgsAlg x
+    elimManyArgsAlg (Inl x) = elimManyArgsAlg x
+    elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
 -- Elimination of `list' and `cons*'
 elimList :: Expr Stage4 -> Expr Core
@@ -492,8 +492,8 @@ instance ElimList LetrecOneArg where
     elimListAlg (LetrecOneArg bindings body) = mkLetrecOneArg bindings body
 
 instance (ElimList f, ElimList g) => ElimList (f :+: g) where
-        elimListAlg (Inl x) = elimListAlg x
-        elimListAlg (Inr x) = elimListAlg x
+    elimListAlg (Inl x) = elimListAlg x
+    elimListAlg (Inr x) = elimListAlg x
 
 macroexpand :: SurfaceExpression -> CoreExpression
 macroexpand = elimList
