@@ -9,6 +9,8 @@ import qualified VL.Environment as Environment
 import VL.Parser (parse)
 import VL.Pretty (pp, render)
 
+import VL.Macroexpand (macroexpand)
+
 import qualified VL.ConcreteEvaluator as Concrete (interpret)
 
 import qualified VL.AbstractAnalysis as Analysis
@@ -21,11 +23,12 @@ concreteInterpret = Concrete.interpret
 abstractInterpret :: String -> String
 abstractInterpret input = render (pp output)
     where
-      (expression, constants) = parse input
+      (surface, constants) = parse input
       environment = Environment.map AbstractScalar
                   $ primitives `Environment.union` constants
-      analysis = analyze (expression, constants)
-      output   = Analysis.lookup expression environment analysis
+      analysis    = analyze (core, constants)
+      output      = Analysis.lookup core environment analysis
+      core        = macroexpand surface
 
 main :: IO ()
 main = defaultMain tests

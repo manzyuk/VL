@@ -4,6 +4,7 @@ module VL.ConcreteEvaluator where
 import VL.Scalar
 import VL.Coproduct
 import VL.Expression
+import VL.Macroexpand
 
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
@@ -156,7 +157,7 @@ primReal v@(ConcreteScalar (Real _)) = v
 primReal _ = error "primReal: the argument is not a real"
 
 interpret :: String -> String
-interpret input = render . pp $ eval expression environment
+interpret input = render . pp $ eval (macroexpand expression) environment
     where
       (expression, constants) = parse input
       environment = Environment.map ConcreteScalar

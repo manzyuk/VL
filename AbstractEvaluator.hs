@@ -5,6 +5,7 @@ import VL.Common
 import VL.Scalar
 import VL.Coproduct
 import VL.Expression
+import VL.Macroexpand
 
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
@@ -17,10 +18,14 @@ import qualified VL.AbstractAnalysis as Analysis
 import VL.Parser (parse)
 import VL.Pretty
 
+import Prelude hiding (read)
+
 import Data.Maybe (isJust)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+
+import Control.Arrow ((***))
 
 import Control.Monad (forever)
 import System.IO
@@ -336,11 +341,12 @@ amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
           = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
-analyze :: (CoreExpression , ScalarEnvironment) -> AbstractAnalysis
+analyze :: (CoreExpression, ScalarEnvironment) -> AbstractAnalysis
 analyze = last . analyze'
 
-analyze' :: (CoreExpression , ScalarEnvironment) -> [AbstractAnalysis]
-analyze' (expression, constants) = iterateUntilStable amendAnalysis analysis0
+analyze' :: (CoreExpression, ScalarEnvironment) -> [AbstractAnalysis]
+analyze' (expression, constants)
+    = iterateUntilStable amendAnalysis analysis0
     where
       analysis0   = Analysis.singleton expression environment AbstractTop
       environment = Environment.map AbstractScalar
@@ -352,11 +358,14 @@ iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
       ys = iterate f x
       zs = zip ys (tail ys)
 
+read :: String -> (CoreExpression, ScalarEnvironment)
+read = (macroexpand *** id) . parse
+
 interpret :: String -> String
-interpret = render . pp . analyze . parse
+interpret = render . pp . analyze . read
 
 interpret' :: String -> String
-interpret' = unlines . map (render . pp) . analyze' . parse
+interpret' = unlines . map (render . pp) . analyze' . read
 
 verbose :: Bool
 verbose = False
