@@ -467,30 +467,5 @@ instance (Functor f, ElimManyArgs f, Functor g, ElimManyArgs g) =>
         elimManyArgsAlg (Inl x) = elimManyArgsAlg x
         elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
--- transform :: SurfaceExpression -> CoreExpression
--- transform (Lambda []  b) = Lambda "#:ignored" (transform b)
--- transform (Lambda [x] b) = Lambda x (transform b)
--- transform (Lambda xs  b) = Lambda "#:args" b''
---     where
---       p   = Variable "#:args"
---       n   = length xs
---       xn  = last xs
---       b'  = Application (Lambda xn (transform b)) (cdnr (n-1) p)
---       b'' = foldr wrap b' (zip xs [0..n-2])
---       wrap (x, k) e = Application (Lambda x e) (cadnr k p)
--- transform (Variable x) = Variable x
--- transform (Application e1 e2)
---     = Application (transform e1) (transform e2)
--- transform (Cons e1 e2)
---     = Cons (transform e1) (transform e2)
--- transform (Letrec ls e)
---     = Letrec ls' e'
---     where
---       e'  = transform e
---       ls' = [ (name, x, b')
---             | (name, xs, b) <- ls
---             , let Lambda x b' = transform (Lambda xs b)
---             ]
-
 -- parse :: String -> (CoreExpression, ScalarEnvironment)
 -- parse = first transform . parseAndConvertConstants
