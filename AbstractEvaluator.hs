@@ -247,27 +247,6 @@ instance (RefineEvalCoreExpr f, RefineEvalCoreExpr g) =>
         refineEvalCoreExpr (Inl x) = refineEvalCoreExpr x
         refineEvalCoreExpr (Inr x) = refineEvalCoreExpr x
 
--- refineEval :: CoreExpression
---            -> AbstractEnvironment
---            -> AbstractAnalysis
---            -> AbstractValue
--- refineEval (Variable x)   env a = Environment.lookup x env
--- refineEval e@(Lambda x b) env a = AbstractClosure env' x b
---     where
---       env' = Environment.restrict (freeVariables e) env
--- refineEval (Application e1 e2) env a
---     = refineApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
--- refineEval (Cons e1 e2) env a
---     | v1 /= AbstractTop && v2 /= AbstractTop
---     = AbstractPair v1 v2
---     | otherwise
---     = AbstractTop
---     where
---       v1 = Analysis.lookup e1 env a
---       v2 = Analysis.lookup e2 env a
--- refineEval (Letrec local_defs body) env a
---     = refineEval (transformLetrec local_defs body) env a
-
 expandApply :: AbstractValue
             -> AbstractValue
             -> AbstractAnalysis
@@ -349,23 +328,6 @@ instance (ExpandEvalCoreExpr f, ExpandEvalCoreExpr g) =>
     ExpandEvalCoreExpr (f :+: g) where
         expandEvalCoreExpr (Inl x) = expandEvalCoreExpr x
         expandEvalCoreExpr (Inr x) = expandEvalCoreExpr x
-
--- expandEval :: CoreExpression
---            -> AbstractEnvironment
---            -> AbstractAnalysis
---            -> AbstractAnalysis
--- expandEval (Variable _) _ _ = Analysis.empty
--- expandEval (Lambda _ _) _ _ = Analysis.empty
--- expandEval (Application e1 e2) env a
---     = Analysis.unions
---       [ Analysis.expand e1 env a
---       , Analysis.expand e2 env a
---       , expandApply (Analysis.lookup e1 env a) (Analysis.lookup e2 env a) a
---       ]
--- expandEval (Cons e1 e2) env a
---     = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
--- expandEval (Letrec local_defs body) env a
---     = expandEval (transformLetrec local_defs body) env a
 
 amendAnalysis :: AbstractAnalysis -> AbstractAnalysis
 amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
