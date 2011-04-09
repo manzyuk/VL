@@ -47,7 +47,8 @@ instance EvalCoreExpr ApplicationOneArg where
         = apply (eval operator env) (eval operand env)
 
 instance EvalCoreExpr Cons where
-    evalCoreExpr (Cons e1 e2) env = ConcretePair (eval e1 env) (eval e2 env)
+    evalCoreExpr (Cons e1 e2) env
+        = ConcretePair (eval e1 env) (eval e2 env)
 
 instance EvalCoreExpr LetrecOneArg where
     evalCoreExpr (LetrecOneArg bindings body) env
