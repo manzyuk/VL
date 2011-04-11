@@ -4,7 +4,7 @@ import Test.Framework.Providers.HUnit
 import Test.HUnit
 
 import VL.Parser (parse)
-import VL.Pretty (pp, render)
+import VL.Pretty (pprint)
 
 import qualified VL.ConcreteEvaluator as Concrete (interpret)
 import qualified VL.AbstractEvaluator as Abstract (interpret)
@@ -25,7 +25,7 @@ testProgramWith interpret program expected
       message  = unlines [ "The program"
                          , program
                          , "with the expansion"
-                         , render . pp . fst . parse $ program
+                         , pprint . fst . parse $ program
                          , "produced the wrong answer"
                          ]
       computed = interpret program
