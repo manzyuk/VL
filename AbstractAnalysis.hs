@@ -41,7 +41,7 @@ lookup :: CoreExpression
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractValue
-lookup e env a = fromMaybe AbstractTop (Map.lookup (e, env) (bindings a))
+lookup e env a = fromMaybe AbstractBottom (Map.lookup (e, env) (bindings a))
 
 insert :: CoreExpression
        -> AbstractEnvironment
@@ -61,7 +61,7 @@ expand e env a
     | (e, env) `member` a
     = empty
     | otherwise
-    = singleton e env AbstractTop
+    = singleton e env AbstractBottom
 
 member :: (CoreExpression, AbstractEnvironment) -> AbstractAnalysis -> Bool
 member (e, env) a = (e, env) `Map.member` (bindings a)

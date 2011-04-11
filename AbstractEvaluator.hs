@@ -35,13 +35,13 @@ refineApply :: AbstractValue
             -> AbstractAnalysis
             -> AbstractValue
 refineApply (AbstractClosure env x e) v a
-    | v /= AbstractTop
+    | v /= AbstractBottom
     = Analysis.lookup e (Environment.insert x v env) a
     | otherwise
-    = AbstractTop
+    = AbstractBottom
 refineApply (AbstractScalar (Primitive p)) v a
     = refinePrimitive p a v
-refineApply AbstractTop _ _ = AbstractTop
+refineApply AbstractBottom _ _ = AbstractBottom
 refineApply _ _ _ = error "refineApply: can't refine an abstract non-function"
 
 refinePrimitive :: Primitive
@@ -89,19 +89,19 @@ refinePrimitive RealPrim _  = primReal
 
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
-primCar AbstractTop = AbstractTop
+primCar AbstractBottom = AbstractBottom
 primCar _ = error "primCar: provably a non-pair where a pair is expected"
 
 primCdr :: AbstractValue -> AbstractValue
 primCdr (AbstractPair _ v2) = v2
-primCdr AbstractTop = AbstractTop
+primCdr AbstractBottom = AbstractBottom
 primCdr _ = error "primCdr: provably a non-pair where a pair is expected"
 
 dyadic :: (AbstractValue -> AbstractValue -> AbstractValue)
        -> AbstractValue
        -> AbstractValue
 dyadic op (AbstractPair v1 v2) = v1 `op` v2
-dyadic op AbstractTop = AbstractTop
+dyadic op AbstractBottom = AbstractBottom
 dyadic op _ = error "dyadic: provably a non-pair where a pair is expected"
 
 data Abstraction a
@@ -163,7 +163,7 @@ comparison op = dyadic $ liftOp float float bool op
 unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
 unary _ AbstractReal = AbstractReal
-unary _ AbstractTop  = AbstractTop
+unary _ AbstractBottom  = AbstractBottom
 unary _ _ = error "unary: provably a non-number where a number is expected"
 
 refineIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
@@ -175,9 +175,9 @@ refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
     = refineThunk e a
 refineIfProc a (AbstractPair AbstractBoolean
                              (AbstractPair t e))
-    = (refineThunk t a) `unifyValues` (refineThunk e a)
-refineIfProc a AbstractTop
-    = AbstractTop
+    = (refineThunk t a) `joinValues` (refineThunk e a)
+refineIfProc a AbstractBottom
+    = AbstractBottom
 refineIfProc a _
     = error "refineIfProc: provably a non-boolean where a boolean is expected"
 
@@ -203,7 +203,7 @@ isBoolean _                            = False
 primReal :: AbstractValue -> AbstractValue
 primReal (AbstractScalar (Real _)) = AbstractReal
 primReal AbstractReal              = AbstractReal
-primReal AbstractTop               = AbstractTop
+primReal AbstractBottom               = AbstractBottom
 primReal _ = error "primReal: the argument is not an abstract real"
 
 class RefineEvalCoreExpr f where
@@ -235,10 +235,10 @@ instance RefineEvalCoreExpr ApplicationOneArg where
 
 instance RefineEvalCoreExpr Cons where
     refineEvalCoreExpr (Cons e1 e2) env a
-        | v1 /= AbstractTop && v2 /= AbstractTop
+        | v1 /= AbstractBottom && v2 /= AbstractBottom
         = AbstractPair v1 v2
         | otherwise
-        = AbstractTop
+        = AbstractBottom
         where
           v1 = Analysis.lookup e1 env a
           v2 = Analysis.lookup e2 env a
@@ -257,13 +257,13 @@ expandApply :: AbstractValue
             -> AbstractAnalysis
             -> AbstractAnalysis
 expandApply (AbstractClosure env x e) v a
-    | v /= AbstractTop
+    | v /= AbstractBottom
     = Analysis.expand e (Environment.insert x v env) a
     | otherwise
     = Analysis.empty
 expandApply (AbstractScalar (Primitive p)) v a
     = expandPrimitive p v a
-expandApply AbstractTop _ _ = Analysis.empty
+expandApply AbstractBottom _ _ = Analysis.empty
 expandApply _ _ _ = error "expandApply: can't expand an abstract non-function"
 
 expandPrimitive :: Primitive
@@ -283,7 +283,7 @@ expandIfProc (AbstractPair (AbstractScalar (Boolean c))
 expandIfProc (AbstractPair AbstractBoolean
                            (AbstractPair t e)) a
     = (expandThunk t a) `Analysis.union` (expandThunk e a)
-expandIfProc AbstractTop _
+expandIfProc AbstractBottom _
     = Analysis.empty
 expandIfProc _ _
     = error "expandIfProc: provably a non-boolean where a boolean is expected"
@@ -348,7 +348,7 @@ analyze' :: (CoreExpression, ScalarEnvironment) -> [AbstractAnalysis]
 analyze' (expression, constants)
     = iterateUntilStable amendAnalysis analysis0
     where
-      analysis0   = Analysis.singleton expression environment AbstractTop
+      analysis0   = Analysis.singleton expression environment AbstractBottom
       environment = Environment.map AbstractScalar
                   $ primitives `Environment.union` constants
 

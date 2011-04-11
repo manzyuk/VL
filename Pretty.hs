@@ -194,7 +194,7 @@ instance Pretty AbstractValue where
     pp (AbstractScalar s)        = pp s
     pp AbstractBoolean           = text "B"
     pp AbstractReal              = text "R"
-    pp AbstractTop               = text "T"
+    pp AbstractBottom            = text "_|_"
     pp (AbstractClosure env x b) = ppClosure env x b
     pp (AbstractPair v1 v2)      = ppPair v1 v2
 
