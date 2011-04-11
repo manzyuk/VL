@@ -11,6 +11,12 @@ import VL.Coproduct
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+import Control.Monad (liftM2)
+import Control.Monad.State
+
 newtype Expr f = In { out :: f (Expr f) }
 
 -- StandaloneDeriving extension allows us to derive Eq and Ord
@@ -252,3 +258,103 @@ pushLetrec bindings body = foldl mkApplicationOneArg f fs
       vs = [v | (v, _, _) <- bindings]
       f  = foldr mkLambdaOneArg body vs
       fs = [mkLambdaOneArg u (mkLetrecOneArg bindings e) | (_, u, e) <- bindings]
+
+-- Alpha renaming
+type Supply = State Int
+
+freshName :: Supply Name
+freshName = do i <- get
+               let name = "#:var" ++ show i
+               put (succ i)
+               return name
+
+type Dictionary = Map Name Name
+
+rename :: Dictionary -> CoreExpression -> CoreExpression
+rename dict = foldExpr (renameAlg dict)
+
+class Functor f => Rename f where
+    renameAlg :: Dictionary -> f CoreExpression -> CoreExpression
+
+maybeRename :: Dictionary -> Name -> Name
+maybeRename dict name = fromMaybe name (Map.lookup name dict)
+
+instance Rename Variable where
+    renameAlg dict (Variable x) = mkVariable x'
+        where
+          x' = maybeRename dict x
+
+instance Rename LambdaOneArg where
+    renameAlg dict (LambdaOneArg arg body) = mkLambdaOneArg arg' body
+        where
+          arg'  = maybeRename dict arg
+
+instance Rename ApplicationOneArg where
+    renameAlg dict (ApplicationOneArg operator operand)
+        = mkApplicationOneArg operator operand
+
+instance Rename Cons where
+    renameAlg dict (Cons e1 e2) = mkCons e1 e2
+
+instance Rename LetrecOneArg where
+    renameAlg dict (LetrecOneArg bindings body)
+        = mkLetrecOneArg bindings' body
+        where
+          bindings' = [ ( maybeRename dict v
+                        , maybeRename dict u
+                        , rename dict e
+                        )
+                      | (u, v, e) <- bindings
+                      ]
+
+instance (Rename f, Rename g) => Rename (f :+: g) where
+    renameAlg dict (Inl x) = renameAlg dict x
+    renameAlg dict (Inr x) = renameAlg dict x
+
+uniquify :: CoreExpression -> CoreExpression
+uniquify = flip evalState 0 . foldExpr uniquifyAlg
+
+class Functor f => Uniquify f where
+    uniquifyAlg :: f (Supply CoreExpression) -> Supply CoreExpression
+
+instance Uniquify Variable where
+    uniquifyAlg (Variable x) = return (mkVariable x)
+
+instance Uniquify LambdaOneArg where
+    uniquifyAlg (LambdaOneArg arg body)
+        = do x <- freshName
+             b <- body
+             return $ mkLambdaOneArg x (rename (Map.singleton arg x) b)
+
+uniquifyLambda :: Name -> Supply CoreExpression -> Supply (Name, CoreExpression)
+uniquifyLambda arg body
+    = do x <- freshName
+         b <- body
+         return (x, rename (Map.singleton arg x) b)
+
+instance Uniquify ApplicationOneArg where
+    uniquifyAlg (ApplicationOneArg operator operand)
+        = liftM2 mkApplicationOneArg operator operand
+
+instance Uniquify Cons where
+    uniquifyAlg (Cons e1 e2) = liftM2 mkCons e1 e2
+
+instance Uniquify LetrecOneArg where
+    uniquifyAlg (LetrecOneArg bindings body)
+        = do vs' <- sequence [ freshName          | v      <- vs ]
+             ls' <- sequence [ uniquifyLambda u e | (u, e) <- ls ]
+             b   <- body
+             let dict = Map.fromList $ zip vs vs'
+                 bindings' = [ (v', u', rename dict e')
+                             | (v', (u', e')) <- zip vs' ls'
+                             ]
+
+                 b' = rename dict b
+             return $ mkLetrecOneArg bindings' b'
+        where
+          vs = [ v      | (v, _, _) <- bindings ]
+          ls = [ (u, e) | (_, u, e) <- bindings ]
+
+instance (Uniquify f, Uniquify g) => Uniquify (f :+: g) where
+    uniquifyAlg (Inl x) = uniquifyAlg x
+    uniquifyAlg (Inr x) = uniquifyAlg x
