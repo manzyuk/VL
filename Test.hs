@@ -49,11 +49,17 @@ tests = [ testGroup "Concrete interpreter"
           (testInterpreter concreteInterpret)
         , testGroup "Abstract interpreter"
           (testInterpreter abstractInterpret)
+        , testGroup "Interaction between LETREC and REAL"
+          [ testCase "prog44" (test_prog44 abstractInterpret)
+          , testCase "prog45" (test_prog45 abstractInterpret)
+          , testCase "prog46" (test_prog46 abstractInterpret)
+          , testCase "prog47" (test_prog47 abstractInterpret)
+          ]
         ]
 
 testInterpreter interpret
     = [ testGroup "Primitives"
-        [ testGroup "car and cdr"
+        [ testGroup "CAR and CDR"
           [ testCase "prog01" (test_prog01 interpret)
           , testCase "prog02" (test_prog02 interpret)
           , testCase "prog03" (test_prog03 interpret)
@@ -101,14 +107,14 @@ testInterpreter interpret
           , testCase "prog35" (test_prog35 interpret)
           ]
         ]
-      , testGroup "let and letrec"
-        [ testGroup "let"
+      , testGroup "LET and LETREC"
+        [ testGroup "LET"
           [ testCase "prog36" (test_prog36 interpret)
           , testCase "prog37" (test_prog37 interpret)
           , testCase "prog38" (test_prog38 interpret)
           , testCase "prog39" (test_prog39 interpret)
           ]
-        , testGroup "letrec"
+        , testGroup "LETREC"
           [ testCase "prog40" (test_prog40 interpret)
           , testCase "prog41" (test_prog41 interpret)
           , testCase "prog42" (test_prog42 interpret)
@@ -167,3 +173,8 @@ test_prog40 interpret = testProgramWith interpret "(letrec ((fact (n) (if (== n 
 test_prog41 interpret = testProgramWith interpret "(letrec ((even? (n) (if (== n 0) #t (odd? (- n 1)))) (odd? (n) (if (== n 0) #f (even? (- n 1))))) (even? 10))" "#t"
 test_prog42 interpret = testProgramWith interpret "(letrec ((gcd (a b) (if (== a 0) b (if (< a b) (gcd b a) (gcd (- a b) b))))) (gcd 18 15))" "3.0"
 test_prog43 interpret = testProgramWith interpret "(letrec ((map (f l) (if (pair? l) (cons (f (car l)) (map f (cdr l))) ()))) (map (lambda (x) (* 2 x)) (list 1 2 3)))" "(2.0 . (4.0 . (6.0 . ())))"
+
+test_prog44 interpret = testProgramWith interpret "(letrec ((fact (n) (if (== n 0) 1 (* n (fact (- n 1)))))) (fact (real 4)))" "R"
+test_prog45 interpret = testProgramWith interpret "(letrec ((even? (n) (if (== n 0) #t (odd? (- n 1)))) (odd? (n) (if (== n 0) #f (even? (- n 1))))) (even? (real 10)))" "B"
+test_prog46 interpret = testProgramWith interpret "(letrec ((gcd (a b) (if (== a 0) b (if (< a b) (gcd b a) (gcd (- a b) b))))) (gcd (real 18) (real 15)))" "R"
+test_prog47 interpret = testProgramWith interpret "(letrec ((map (f l) (if (pair? l) (cons (f (car l)) (map f (cdr l))) ()))) (map (lambda (x) (* 2 x)) (list (real 1) (real 2) (real 3))))" "(R . (R . (R . ())))"
