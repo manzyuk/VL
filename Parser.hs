@@ -23,7 +23,7 @@ import Control.Monad.State
 import Control.Arrow (first, (***))
 
 import VL.Pretty (pp, render)
-import VL.Macroexpand (macroexpand)
+import VL.Macroexpand (prepare)
 
 -- A custom parser type that carries around additional state used for
 -- constant conversion.  The state consists of a scalar environment

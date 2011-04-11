@@ -157,7 +157,7 @@ primReal v@(ConcreteScalar (Real _)) = v
 primReal _ = error "primReal: the argument is not a real"
 
 interpret :: String -> String
-interpret input = render . pp $ eval (macroexpand expression) environment
+interpret input = render . pp $ eval (prepare expression) environment
     where
       (expression, constants) = parse input
       environment = Environment.map ConcreteScalar

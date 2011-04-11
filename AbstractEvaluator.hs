@@ -359,7 +359,7 @@ iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
       zs = zip ys (tail ys)
 
 read :: String -> (CoreExpression, ScalarEnvironment)
-read = (macroexpand *** id) . parse
+read = (prepare *** id) . parse
 
 interpret :: String -> String
 interpret = render . pp . analyze . read
