@@ -17,7 +17,7 @@ data AbstractValue
 
 type AbstractEnvironment = Environment AbstractValue
 
--- Join in the join-semilattice of abstract values
+-- Join of abstract values
 joinValues :: AbstractValue -> AbstractValue -> AbstractValue
 joinValues v1 v2
     | v1 == AbstractBottom
