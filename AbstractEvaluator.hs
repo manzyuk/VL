@@ -361,17 +361,30 @@ iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
 read :: String -> (CoreExpression, ScalarEnvironment)
 read = (prepare *** id) . parse
 
-interpret :: String -> String
-interpret = render . pp . analyze . read
+interpretMinimal :: String -> String
+interpretMinimal input = render (pp output)
+    where
+      (expression, constants) = read input
+      environment = Environment.map AbstractScalar
+                  $ primitives `Environment.union` constants
+      analysis    = analyze (expression, constants)
+      output      = Analysis.lookup expression environment analysis
 
-interpret' :: String -> String
-interpret' = unlines . map (render . pp) . analyze' . read
+interpretCompact :: String -> String
+interpretCompact = render . pp . analyze . read
 
-verbose :: Bool
-verbose = False
+interpretVerbose :: String -> String
+interpretVerbose = unlines . map (render . pp) . analyze' . read
 
-interpreter :: IO ()
-interpreter = do
+interpret = interpretMinimal
+
+data Verbosity
+    = Minimal        -- Print the abstract value of an expression only
+    | Compact        -- Print the whole abstract analysis
+    | Verbose        -- Print intermediate analyses
+
+interpreter :: Verbosity -> IO ()
+interpreter verbosity = do
   hSetBuffering stdin  NoBuffering
   hSetBuffering stdout NoBuffering
   forever repl
@@ -379,8 +392,9 @@ interpreter = do
       repl = do
         putStr prompt
         input <- getLine
-        putStrLn $ process input
+        putStrLn $ interpret verbosity input
 
       prompt = "vl> "
-      process | verbose   = interpret'
-              | otherwise = interpret
+      interpret Minimal = interpretMinimal
+      interpret Compact = interpretCompact
+      interpret Verbose = interpretVerbose
