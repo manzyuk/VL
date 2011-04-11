@@ -16,7 +16,7 @@ import VL.AbstractAnalysis (AbstractAnalysis)
 import qualified VL.AbstractAnalysis as Analysis
 
 import VL.Parser (parse)
-import VL.Pretty
+import VL.Pretty (pprint)
 
 import Prelude hiding (read)
 
@@ -362,7 +362,7 @@ read :: String -> (CoreExpression, ScalarEnvironment)
 read = (prepare *** id) . parse
 
 interpretMinimal :: String -> String
-interpretMinimal input = render (pp output)
+interpretMinimal input = pprint output
     where
       (expression, constants) = read input
       environment = Environment.map AbstractScalar
@@ -371,10 +371,10 @@ interpretMinimal input = render (pp output)
       output      = Analysis.lookup expression environment analysis
 
 interpretCompact :: String -> String
-interpretCompact = render . pp . analyze . read
+interpretCompact = pprint . analyze . read
 
 interpretVerbose :: String -> String
-interpretVerbose = unlines . map (render . pp) . analyze' . read
+interpretVerbose = unlines . map pprint . analyze' . read
 
 interpret = interpretMinimal
 

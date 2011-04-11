@@ -11,8 +11,8 @@ import qualified VL.Environment as Environment
 
 import VL.ConcreteValue
 
-import VL.Parser
-import VL.Pretty
+import VL.Parser (parse)
+import VL.Pretty (pprint)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -137,7 +137,7 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
-primIfProc v = error $ "Malformed IF expression: " ++ (render (pp v))
+primIfProc v = error $ "Malformed IF expression: " ++ (pprint v)
 
 predicate :: (ConcreteValue -> Bool) -> ConcreteValue -> ConcreteValue
 predicate p = ConcreteScalar . Boolean . p
@@ -157,7 +157,7 @@ primReal v@(ConcreteScalar (Real _)) = v
 primReal _ = error "primReal: the argument is not a real"
 
 interpret :: String -> String
-interpret input = render . pp $ eval (prepare expression) environment
+interpret input = pprint $ eval (prepare expression) environment
     where
       (expression, constants) = parse input
       environment = Environment.map ConcreteScalar

@@ -1,10 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, TypeOperators #-}
-module VL.Pretty
-    ( Pretty
-    , pp
-    , render
-    )
-    where
+module VL.Pretty (pprint) where
 
 import VL.Common
 import VL.Scalar
@@ -23,6 +18,9 @@ import Text.PrettyPrint
 
 class Pretty a where
     pp :: a -> Doc
+
+pprint :: Pretty a => a -> String
+pprint = render . pp
 
 instance Pretty Name where
     pp = text
