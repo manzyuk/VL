@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 
 import Control.Monad (forever)
 import System.IO
+import Control.Exception
 
 -- The following meta-circular evaluator is not fully modular.  A more
 -- general class @EvalExpr@ would have a method @evalExpr@ of the type
@@ -167,7 +168,7 @@ interpreter :: IO ()
 interpreter = do
   hSetBuffering stdin  NoBuffering
   hSetBuffering stdout NoBuffering
-  forever repl
+  forever . handle (\e -> print (e :: ErrorCall)) $ repl
     where
       repl = do
         putStr prompt

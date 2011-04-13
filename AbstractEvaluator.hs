@@ -29,6 +29,7 @@ import Control.Arrow ((***))
 
 import Control.Monad (forever)
 import System.IO
+import Control.Exception
 
 refineApply :: AbstractValue
             -> AbstractValue
@@ -387,14 +388,15 @@ interpreter :: Verbosity -> IO ()
 interpreter verbosity = do
   hSetBuffering stdin  NoBuffering
   hSetBuffering stdout NoBuffering
-  forever repl
+  forever . handle (\e -> print (e :: ErrorCall)) $ repl
     where
       repl = do
         putStr prompt
         input <- getLine
-        putStrLn $ interpret verbosity input
+        putStrLn $ interpret input
 
       prompt = "vl> "
-      interpret Minimal = interpretMinimal
-      interpret Compact = interpretCompact
-      interpret Verbose = interpretVerbose
+      interpret = case verbosity of
+                    Minimal -> interpretMinimal
+                    Compact -> interpretCompact
+                    Verbose -> interpretVerbose
