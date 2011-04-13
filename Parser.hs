@@ -11,7 +11,7 @@ import VL.Expression
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
 
-import VL.Token (Token, scan)
+import VL.Token (Token)
 import qualified VL.Token as Token
 
 import Text.Parsec.Prim       hiding (many, (<|>), State, token, parse)
@@ -20,7 +20,7 @@ import Text.Parsec.Combinator (between)
 
 import Control.Applicative
 import Control.Monad.State
-import Control.Arrow (first, (***))
+import Control.Arrow
 
 -- A custom parser type that carries around additional state used for
 -- constant conversion.  The state consists of a scalar environment
@@ -75,6 +75,7 @@ keywords = [ "lambda"
            , "if"
            , "or"
            , "and"
+           , "not"
            , "cond"
            , "let"
            , "letrec"
@@ -181,7 +182,7 @@ parse :: String -> (SurfaceExpression, ScalarEnvironment)
 parse = ((either (\_ -> error "parse error") id) *** fst)
       . flip runState (initialEnvironment, 0)
       . runParserT expression () ""
-      . scan
+      . Token.scan
     where
       initialEnvironment
           = Environment.fromList
