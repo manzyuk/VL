@@ -138,7 +138,7 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
-primIfProc v = error $ "Malformed IF expression: " ++ (pprint v)
+primIfProc v = error $ unlines ["Malformed IF expression:", pprint v]
 
 predicate :: (ConcreteValue -> Bool) -> ConcreteValue -> ConcreteValue
 predicate p = ConcreteScalar . Boolean . p

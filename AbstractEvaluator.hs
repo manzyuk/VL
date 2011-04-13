@@ -165,7 +165,7 @@ unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
 unary _ AbstractReal = AbstractReal
 unary _ AbstractBottom  = AbstractBottom
-unary _ _ = error "unary: provably a non-number where a number is expected"
+unary _ _ = error "unary: provably a non-real where some real is expected"
 
 refineIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
 refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
@@ -180,7 +180,7 @@ refineIfProc a (AbstractPair AbstractBoolean
 refineIfProc a AbstractBottom
     = AbstractBottom
 refineIfProc a _
-    = error "refineIfProc: provably a non-boolean where a boolean is expected"
+    = error "refineIfProc: provably a non-boolean where some boolean is expected"
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
 refineThunk (AbstractClosure env x e) a
@@ -205,7 +205,7 @@ primReal :: AbstractValue -> AbstractValue
 primReal (AbstractScalar (Real _)) = AbstractReal
 primReal AbstractReal              = AbstractReal
 primReal AbstractBottom               = AbstractBottom
-primReal _ = error "primReal: the argument is not an abstract real"
+primReal _ = error "primReal: the argument is not some real"
 
 class RefineEvalCoreExpr f where
     refineEvalCoreExpr :: f CoreExpression
@@ -287,7 +287,7 @@ expandIfProc (AbstractPair AbstractBoolean
 expandIfProc AbstractBottom _
     = Analysis.empty
 expandIfProc _ _
-    = error "expandIfProc: provably a non-boolean where a boolean is expected"
+    = error "expandIfProc: provably a non-boolean where some boolean is expected"
 
 expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandThunk (AbstractClosure env x e) a
