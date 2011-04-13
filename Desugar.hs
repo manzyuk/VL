@@ -8,7 +8,7 @@ import VL.Expression
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Control.Monad (liftM2)
+import Control.Monad
 import Control.Monad.State
 
 -- Elimination of derived conditionals (`or', `and', `cond')
