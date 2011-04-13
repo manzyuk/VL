@@ -3,7 +3,7 @@ module VL.AbstractValue where
 import VL.Common
 import VL.Scalar
 import VL.Expression
-import VL.Environment (Environment, fromList)
+import VL.Environment (Environment)
 import qualified VL.Environment as Environment
 
 data AbstractValue
@@ -51,7 +51,7 @@ joinValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
       -- equal, then the environments must contain the same set of
       -- variables.
       joinEnvironments env1 env2
-          = fromList $ map joinBindings (Environment.domain env1)
+          = Environment.fromList $ map joinBindings (Environment.domain env1)
       joinBindings x
           = (x, (Environment.lookup x env1) `joinValues` (Environment.lookup x env2))
 joinValues (AbstractPair v1 v2) (AbstractPair v1' v2')

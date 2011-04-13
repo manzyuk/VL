@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeOperators, FlexibleContexts #-}
+
 module VL.Desugar (desugar, prepare) where
 
 import VL.Common
@@ -11,7 +12,7 @@ import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.State
 
--- Elimination of derived conditionals (`or', `and', `cond')
+-- Elimination of derived conditionals (OR, AND, COND)
 type Stage1  =  Variable
             :+: LambdaManyArgs
             :+: ApplicationManyArgs
@@ -82,7 +83,7 @@ instance (ElimConditionals f, ElimConditionals g) =>
         elimConditionalsAlg (Inl x) = elimConditionalsAlg x
         elimConditionalsAlg (Inr x) = elimConditionalsAlg x
 
--- Elimination of `if'
+-- Elimination of IF
 type Stage2  =  Variable
             :+: LambdaManyArgs
             :+: ApplicationManyArgs
@@ -135,7 +136,7 @@ instance (ElimIf f, ElimIf g) => ElimIf (f :+: g) where
     elimIfAlg (Inl x) = elimIfAlg x
     elimIfAlg (Inr x) = elimIfAlg x
 
--- Elimination of `let'
+-- Elimination of LET
 type Stage3  =  Variable
             :+: LambdaManyArgs
             :+: ApplicationManyArgs
@@ -183,7 +184,7 @@ instance (ElimLet f, ElimLet g) => ElimLet (f :+: g) where
     elimLetAlg (Inl x) = elimLetAlg x
     elimLetAlg (Inr x) = elimLetAlg x
 
--- Elimination of many arguments (in lambdas, applications, and letrec bindings)
+-- Elimination of many arguments (in lambdas, applications, and LETREC bindings)
 type Stage4  =  Variable
             :+: LambdaOneArg
             :+: ApplicationOneArg
@@ -273,7 +274,7 @@ instance (ElimManyArgs f, ElimManyArgs g) => ElimManyArgs (f :+: g) where
     elimManyArgsAlg (Inl x) = elimManyArgsAlg x
     elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
--- Elimination of `list' and `cons*'
+-- Elimination of LIST and CONS*
 elimList :: Expr Stage4 -> Expr Core
 elimList = foldExpr elimListAlg
 
