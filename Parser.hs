@@ -138,6 +138,8 @@ parseOr
     = special "or"      $ liftA  mkOr (many expression)
 parseAnd
     = special "and"     $ liftA  mkAnd (many expression)
+parseNot
+    = special "not"     $ liftA  mkNot expression
 parseCond
     = special "cond"    $ liftA  mkCond clauses
     where
@@ -169,6 +171,7 @@ expression = atom <|> list
              <|> try parseIf
              <|> try parseOr
              <|> try parseAnd
+             <|> try parseNot
              <|> try parseCond
              <|> try parseLet
              <|> try parseLetrec

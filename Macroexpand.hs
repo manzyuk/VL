@@ -62,6 +62,9 @@ instance ElimConditionals And where
         where
           wrap x y = mkIf x y (mkVariable false)
 
+instance ElimConditionals Not where
+    elimConditionalsAlg (Not x) = mkIf x (mkVariable false) (mkVariable true)
+
 instance ElimConditionals Cond where
     elimConditionalsAlg (Cond clauses) = foldr wrap (mkVariable nil) clauses
         where

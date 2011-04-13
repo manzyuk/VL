@@ -58,6 +58,8 @@ data Or                  a = Or [a]
                              deriving (Eq, Ord, Functor)
 data And                 a = And [a]
                              deriving (Eq, Ord, Functor)
+data Not                 a = Not a
+                             deriving (Eq, Ord, Functor)
 data Cond                a = Cond [(a, a)]
                              deriving (Eq, Ord, Functor)
 
@@ -118,6 +120,9 @@ mkOr xs = inject (Or xs)
 
 mkAnd :: (And :<: f) => [Expr f] -> Expr f
 mkAnd xs = inject (And xs)
+
+mkNot :: (Not :<: f) => Expr f -> Expr f
+mkNot x = inject (Not x)
 
 mkCond :: (Cond :<: f) => [(Expr f, Expr f)] -> Expr f
 mkCond branches = inject (Cond branches)
@@ -180,6 +185,9 @@ instance FreeVariables Or where
 instance FreeVariables And where
     freeVariablesAlg (And xs) = Set.unions xs
 
+instance FreeVariables Not where
+    freeVariablesAlg (Not x) = x
+
 instance FreeVariables Let where
     freeVariablesAlg (Let bindings body)
         = (body `Set.union` vs) \\ ns
@@ -231,6 +239,7 @@ type Surface
       :+: If
       :+: Or
       :+: And
+      :+: Not
       :+: Cond
       :+: Let
       :+: LetrecManyArgs
