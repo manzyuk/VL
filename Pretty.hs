@@ -75,6 +75,10 @@ instance Display And where
     displayAlg (And xs)
         = parens $ sep (text "and" : xs)
 
+instance Display Not where
+    displayAlg (Not x)
+        = parens $ sep [text "not", x]
+
 instance Display Cond where
     displayAlg (Cond clauses)
         = parens $ sep (text "cond" : map ppClause clauses)
