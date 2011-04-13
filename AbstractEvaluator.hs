@@ -5,7 +5,6 @@ import VL.Common
 import VL.Scalar
 import VL.Coproduct
 import VL.Expression
-import VL.Macroexpand
 
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
@@ -15,8 +14,9 @@ import VL.AbstractValue
 import VL.AbstractAnalysis (AbstractAnalysis)
 import qualified VL.AbstractAnalysis as Analysis
 
-import VL.Parser (parse)
-import VL.Pretty (pprint)
+import VL.Parser
+import VL.Pretty
+import VL.Desugar
 
 import Prelude hiding (read)
 

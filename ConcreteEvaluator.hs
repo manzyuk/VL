@@ -4,15 +4,15 @@ module VL.ConcreteEvaluator where
 import VL.Scalar
 import VL.Coproduct
 import VL.Expression
-import VL.Macroexpand
 
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
 
 import VL.ConcreteValue
 
-import VL.Parser (parse)
-import VL.Pretty (pprint)
+import VL.Parser
+import VL.Pretty
+import VL.Desugar
 
 import Data.Set (Set)
 import qualified Data.Set as Set

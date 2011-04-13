@@ -15,7 +15,7 @@ test: Test.hs
 		Token.hs \
 		ConcreteEvaluator.hs \
 		Coproduct.hs \
-		Macroexpand.hs \
+		Desugar.hs \
 	-threaded -o test && ./test
 
 clean:

@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeOperators, FlexibleContexts #-}
-module VL.Macroexpand where
+module VL.Desugar (desugar, prepare) where
 
 import VL.Common
 import VL.Coproduct
@@ -311,12 +311,12 @@ instance (ElimList f, ElimList g) => ElimList (f :+: g) where
     elimListAlg (Inl x) = elimListAlg x
     elimListAlg (Inr x) = elimListAlg x
 
-macroexpand :: SurfaceExpression -> CoreExpression
-macroexpand = elimList
-            . elimManyArgs
-            . elimLet
-            . elimIf
-            . elimConditionals
+desugar :: SurfaceExpression -> CoreExpression
+desugar = elimList
+        . elimManyArgs
+        . elimLet
+        . elimIf
+        . elimConditionals
 
 -- Variable renaming
 type Dictionary = Map Name Name
@@ -419,4 +419,4 @@ instance (Uniquify f, Uniquify g) => Uniquify (f :+: g) where
 
 -- Uniquification is necessary for the correctness of `pushLetrec'.
 prepare :: SurfaceExpression -> CoreExpression
-prepare = uniquify . macroexpand
+prepare = uniquify . desugar
