@@ -17,13 +17,25 @@ data AbstractValue
 
 type AbstractEnvironment = Environment AbstractValue
 
--- Join of abstract values
+-- The set of abstract values is a partial order (in fact, a cpo):
+--   * AbstractBottom is the least element;
+--   * AbstractReal is greater than any concrete real;
+--   * AbstractBoolean is greater than any concrete boolean;
+--   * for abstract pairs,
+--       (x1, y1) >= (x2, y2) iff x1 >= x2 and y1 >= y2;
+--   * for abstract closures,
+--                                         exp1 == exp2
+--       (env1, exp1) >= (env2, exp2) iff      and
+--                                         env1 >= env2;
+--     here env1 >= env2 iff env1 and env2 contain the same variables
+--     (which is the case if exp1 == exp2, by our assumption about
+--     closures) and for every variable x, env1 x >= env2 x.
+-- The function 'joinValues' implements join in the poset of abstract
+-- values.  WARNING: Not every pair of abstract values has a join!
 joinValues :: AbstractValue -> AbstractValue -> AbstractValue
+joinValues AbstractBottom v2 = v2
+joinValues v1 AbstractBottom = v1
 joinValues v1 v2
-    | v1 == AbstractBottom
-    = v2
-    | v2 == AbstractBottom
-    = v1
     | v1 == v2
     = v1
     | isSomeBoolean v1 && isSomeBoolean v2
