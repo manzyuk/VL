@@ -19,4 +19,4 @@ test: Test.hs
 	-threaded -o test && ./test
 
 clean:
-	rm test *.o *.hi
+	rm -f test *.o *.hi
