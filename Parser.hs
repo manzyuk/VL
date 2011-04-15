@@ -114,15 +114,15 @@ parens = between lparen rparen
 listOf :: Parser a -> Parser [a]
 listOf p = parens (many p)
 
-args :: Parser [Name]
-args = listOf identifier
+formals :: Parser [Name]
+formals = listOf identifier
 
 body :: Parser SurfaceExpression
 body = expression
 
 -- Expression parsers.
 parseLambda
-    = special "lambda"  $ liftA2 mkLambdaManyArgs args body
+    = special "lambda"  $ liftA2 mkLambdaManyArgs formals body
 parseCons
     = special "cons"    $ liftA2 mkCons expression expression
 parseList
@@ -156,7 +156,7 @@ parseLetrec
     = special "letrec"  $ liftA2 mkLetrecManyArgs bindings body
     where
       bindings = listOf binding
-      binding  = parens $ liftA3 (,,) identifier args body
+      binding  = parens $ liftA3 (,,) identifier formals body
 
 parseApplication = liftA2 mkApplicationManyArgs expression (many expression)
 
