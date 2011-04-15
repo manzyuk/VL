@@ -45,16 +45,16 @@ symbol k = token maybeSymbol
       maybeSymbol _   = Nothing
 
 -- Accepts the token @t@ with the result @t@.
-literate :: Token -> Parser Token
-literate t = token maybeLiterate
+literal :: Token -> Parser Token
+literal t = token maybeLiteral
     where
-      maybeLiterate x
+      maybeLiteral x
           | x == t    = Just x
           | otherwise = Nothing
 
 lparen, rparen :: Parser Token
-lparen = literate Token.LParen
-rparen = literate Token.RParen
+lparen = literal Token.LParen
+rparen = literal Token.RParen
 
 -- Accepts a token @t@ with the result @n@ when @t@ is the identifier
 -- @n@ that is not a reserved keyword.
