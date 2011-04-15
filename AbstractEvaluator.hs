@@ -189,7 +189,8 @@ refineThunk (AbstractClosure env x e) a
 refineThunk _ _ = error "refineThunk: the argument is not a thunk"
 
 predicate :: (AbstractValue -> Bool) -> AbstractValue -> AbstractValue
-predicate p = AbstractScalar . Boolean . p
+predicate _ AbstractBottom = AbstractBottom
+predicate p v              = AbstractScalar (Boolean (p v))
 
 isNull, isPair, isReal, isBoolean :: AbstractValue -> Bool
 isNull (AbstractScalar Nil)            = True
@@ -197,8 +198,10 @@ isNull _                               = False
 isPair (AbstractPair _ _)              = True
 isPair _                               = False
 isReal (AbstractScalar (Real _))       = True
+isReal AbstractReal                    = True
 isReal _                               = False
 isBoolean (AbstractScalar (Boolean _)) = True
+isBoolean AbstractBoolean              = True
 isBoolean _                            = False
 
 primReal :: AbstractValue -> AbstractValue
