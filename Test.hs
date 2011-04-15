@@ -90,6 +90,8 @@ testInterpreter interpreter
           , testCase "prog33" (test_prog33 interpreter)
           , testCase "prog34" (test_prog34 interpreter)
           , testCase "prog35" (test_prog35 interpreter)
+          , testCase "prog48" (test_prog48 interpreter)
+          , testCase "prog49" (test_prog49 interpreter)
           ]
         ]
       , testGroup "LET and LETREC"
@@ -148,6 +150,9 @@ test_prog32 interpreter = testProgramWith interpreter "(real? 3)" "#t"
 test_prog33 interpreter = testProgramWith interpreter "(real? #t)" "#f"
 test_prog34 interpreter = testProgramWith interpreter "(boolean? #f)" "#t"
 test_prog35 interpreter = testProgramWith interpreter "(boolean? 3)" "#f"
+
+test_prog48 interpreter = testProgramWith interpreter "(real? (real 3))" "#t"
+test_prog49 interpreter = testProgramWith interpreter "((lambda (x) (boolean? (> x 0))) (real 3))" "#t"
 
 test_prog36 interpreter = testProgramWith interpreter "(let ((x 1) (y 2)) (+ x y))" "3.0"
 test_prog37 interpreter = testProgramWith interpreter "(let ((abs (lambda (x) (if (> x 0) x (negate x))))) (abs (- 3 4)))" "1.0"
