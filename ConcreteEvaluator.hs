@@ -115,13 +115,13 @@ primCdr _ = error "primCdr: can't apply cdr to a non-pair"
 
 unary :: (Float -> Float) -> ConcreteValue -> ConcreteValue
 unary f (ConcreteScalar (Real r)) = ConcreteScalar (Real (f r))
-unary _ _ = error "unary: can't perform arithmetics on non-numbers"
+unary _ _ = error "unary: can't perform arithmetic on non-numbers"
 
 arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
 arithmetic op (ConcretePair (ConcreteScalar (Real r1))
                             (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
-arithmetic _ _ = error "arithmetic: can't perform arithmetics on non-numbers"
+arithmetic _ _ = error "arithmetic: can't perform arithmetic on non-numbers"
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
