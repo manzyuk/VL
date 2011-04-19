@@ -7,98 +7,81 @@ module VL.Expression where
 
 import VL.Common
 import VL.Coproduct
+import VL.FixedPoint
 
 import Data.Set (Set, (\\))
 import qualified Data.Set as Set
 
-newtype Expr f = In { out :: f (Expr f) }
-
--- StandaloneDeriving extension allows us to derive Eq and Ord
--- instances for Expr f.  I've borrowed this idea from
---
--- http://mainisusuallyafunction.blogspot.com/2010/12/type-level-fix-and-generic-folds.html
---
--- See also
---
--- http://www.haskell.org/ghc/docs/6.12.2/html/users_guide/deriving.html#stand-alone-deriving
---
--- Thanks to DeriveFunctor extension we can get rid of another
--- chunk of boilerplate.
-
-deriving instance (Eq  (f (Expr f))) => Eq  (Expr f)
-deriving instance (Ord (f (Expr f))) => Ord (Expr f)
+type Expr = Fix
 
 data Variable            a = Variable Name
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Lambda expressions
 data LambdaOneArg        a = LambdaOneArg Name a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data LambdaManyArgs      a = LambdaManyArgs [Name] a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Procedure calls
 data ApplicationOneArg   a = ApplicationOneArg a a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data ApplicationManyArgs a = ApplicationManyArgs a [a]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Pairs
 data Cons                a = Cons a a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data List                a = List [a]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data ConsStar            a = ConsStar [a]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Conditionals
 data If                  a = If a a a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data Or                  a = Or [a]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data And                 a = And [a]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data Not                 a = Not a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data Cond                a = Cond [(a, a)]
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Binding constructs
 data Let                 a = Let [(Name, a)] a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data LetrecOneArg        a = LetrecOneArg [(Name, Name, a)] a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 data LetrecManyArgs      a = LetrecManyArgs [(Name, [Name], a)] a
-                             deriving (Eq, Ord, Functor)
+			     deriving (Eq, Ord, Functor)
 
 -- Folding over expressions
-foldExpr :: Functor f => (f a -> a) -> Expr f -> a
-foldExpr f (In t) = f (fmap (foldExpr f) t)
+foldExpr :: Functor f => (f a -> a) -> Fix f -> a
+foldExpr = cata
 
 -- Smart constructors
-inject :: (g :<: f) => g (Expr f) -> Expr f
-inject = In . inj
-
 mkVariable :: (Variable :<: f) => Name -> Expr f
 mkVariable x = inject (Variable x)
 
 mkLambdaOneArg :: (LambdaOneArg :<: f)
-               => Name -> Expr f -> Expr f
+	       => Name -> Expr f -> Expr f
 mkLambdaOneArg arg body
     = inject (LambdaOneArg arg body)
 
 mkLambdaManyArgs :: (LambdaManyArgs :<: f)
-                 => [Name] -> Expr f -> Expr f
+		 => [Name] -> Expr f -> Expr f
 mkLambdaManyArgs args body
     = inject (LambdaManyArgs args body)
 
 mkApplicationOneArg :: (ApplicationOneArg :<: f)
-                    => Expr f -> Expr f -> Expr f
+		    => Expr f -> Expr f -> Expr f
 mkApplicationOneArg operator operand
     = inject (ApplicationOneArg operator operand)
 
 mkApplicationManyArgs :: (ApplicationManyArgs :<: f)
-                      => Expr f -> [Expr f] -> Expr f
+		      => Expr f -> [Expr f] -> Expr f
 mkApplicationManyArgs operator operands
     = inject (ApplicationManyArgs operator operands)
 
@@ -131,12 +114,12 @@ mkLet :: (Let :<: f) => [(Name, Expr f)] -> Expr f -> Expr f
 mkLet bindings body = inject (Let bindings body)
 
 mkLetrecOneArg :: (LetrecOneArg :<: f)
-               => [(Name, Name, Expr f)] -> Expr f -> Expr f
+	       => [(Name, Name, Expr f)] -> Expr f -> Expr f
 mkLetrecOneArg bindings body
     = inject (LetrecOneArg bindings body)
 
 mkLetrecManyArgs :: (LetrecManyArgs :<: f)
-                 => [(Name, [Name], Expr f)] -> Expr f -> Expr f
+		 => [(Name, [Name], Expr f)] -> Expr f -> Expr f
 mkLetrecManyArgs bindings body
     = inject (LetrecManyArgs bindings body)
 
@@ -152,19 +135,19 @@ instance FreeVariables Variable where
 
 instance FreeVariables LambdaOneArg where
     freeVariablesAlg (LambdaOneArg arg body)
-        = Set.delete arg body
+	= Set.delete arg body
 
 instance FreeVariables LambdaManyArgs where
     freeVariablesAlg (LambdaManyArgs args body)
-        = body \\ (Set.fromList args)
+	= body \\ (Set.fromList args)
 
 instance FreeVariables ApplicationOneArg where
     freeVariablesAlg (ApplicationOneArg operator operand)
-        = operator `Set.union` operand
+	= operator `Set.union` operand
 
 instance FreeVariables ApplicationManyArgs where
     freeVariablesAlg (ApplicationManyArgs operator operands)
-        = Set.unions (operator : operands)
+	= Set.unions (operator : operands)
 
 instance FreeVariables Cons where
     freeVariablesAlg (Cons x1 x2) = x1 `Set.union` x2
@@ -177,7 +160,7 @@ instance FreeVariables ConsStar where
 
 instance FreeVariables If where
     freeVariablesAlg (If predicate consequent alternate)
-        = Set.unions [predicate, consequent, alternate]
+	= Set.unions [predicate, consequent, alternate]
 
 instance FreeVariables Or where
     freeVariablesAlg (Or xs) = Set.unions xs
@@ -190,30 +173,30 @@ instance FreeVariables Not where
 
 instance FreeVariables Let where
     freeVariablesAlg (Let bindings body)
-        = (body `Set.union` vs) \\ ns
-        where
-          ns = Set.fromList [ name
-                            | (name, _) <- bindings ]
-          vs = Set.unions   [ expr
-                            | (_, expr) <- bindings ]
+	= (body `Set.union` vs) \\ ns
+	where
+	  ns = Set.fromList [ name
+			    | (name, _) <- bindings ]
+	  vs = Set.unions   [ expr
+			    | (_, expr) <- bindings ]
 
 instance FreeVariables LetrecOneArg where
     freeVariablesAlg (LetrecOneArg bindings body)
-        = (body `Set.union` vs) \\ ns
-        where
-          ns = Set.fromList [ name
-                            | (name, _, _)   <- bindings ]
-          vs = Set.unions   [ Set.delete arg body
-                            | (_, arg, body) <- bindings ]
+	= (body `Set.union` vs) \\ ns
+	where
+	  ns = Set.fromList [ name
+			    | (name, _, _)   <- bindings ]
+	  vs = Set.unions   [ Set.delete arg body
+			    | (_, arg, body) <- bindings ]
 
 instance FreeVariables LetrecManyArgs where
     freeVariablesAlg (LetrecManyArgs bindings body)
-        = (body `Set.union` vs) \\ ns
-        where
-          ns = Set.fromList [ name
-                            | (name, _, _)    <- bindings ]
-          vs = Set.unions   [ body \\ (Set.fromList args)
-                            | (_, args, body) <- bindings ]
+	= (body `Set.union` vs) \\ ns
+	where
+	  ns = Set.fromList [ name
+			    | (name, _, _)    <- bindings ]
+	  vs = Set.unions   [ body \\ (Set.fromList args)
+			    | (_, args, body) <- bindings ]
 
 instance (FreeVariables f, FreeVariables g) => FreeVariables (f :+: g) where
     freeVariablesAlg (Inl x) = freeVariablesAlg x
@@ -255,11 +238,11 @@ type SurfaceExpression = Expr Surface
 --
 -- where ei* = letrec v1 = \u1. e1, ..., vn = \un. en in ei.
 pushLetrec :: (ApplicationOneArg :<: f, LambdaOneArg :<: f, LetrecOneArg :<: f)
-           => [(Name, Name, Expr f)] -> Expr f -> Expr f
+	   => [(Name, Name, Expr f)] -> Expr f -> Expr f
 pushLetrec bindings body = foldl mkApplicationOneArg f fs
     where
       vs = [ v | (v, _, _) <- bindings ]
       f  = foldr mkLambdaOneArg body vs
       fs = [ mkLambdaOneArg u (mkLetrecOneArg bindings e)
-           | (_, u, e) <- bindings
-           ]
+	   | (_, u, e) <- bindings
+	   ]
