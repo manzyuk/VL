@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances    #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances            #-}
 {-# LANGUAGE StandaloneDeriving, DeriveFunctor              #-}
+{-# LANGUAGE TemplateHaskell                                #-}
 module VL.Expression where
 
 import VL.Common
@@ -62,66 +63,23 @@ foldExpr :: Functor f => (f a -> a) -> Fix f -> a
 foldExpr = cata
 
 -- Smart constructors
-mkVariable :: (Variable :<: f) => Name -> Expr f
-mkVariable x = inject (Variable x)
-
-mkLambdaOneArg :: (LambdaOneArg :<: f)
-	       => Name -> Expr f -> Expr f
-mkLambdaOneArg arg body
-    = inject (LambdaOneArg arg body)
-
-mkLambdaManyArgs :: (LambdaManyArgs :<: f)
-		 => [Name] -> Expr f -> Expr f
-mkLambdaManyArgs args body
-    = inject (LambdaManyArgs args body)
-
-mkApplicationOneArg :: (ApplicationOneArg :<: f)
-		    => Expr f -> Expr f -> Expr f
-mkApplicationOneArg operator operand
-    = inject (ApplicationOneArg operator operand)
-
-mkApplicationManyArgs :: (ApplicationManyArgs :<: f)
-		      => Expr f -> [Expr f] -> Expr f
-mkApplicationManyArgs operator operands
-    = inject (ApplicationManyArgs operator operands)
-
-mkCons :: (Cons :<: f) => Expr f -> Expr f -> Expr f
-mkCons x1 x2 = inject (Cons x1 x2)
-
-mkList :: (List :<: f) => [Expr f] -> Expr f
-mkList xs = inject (List xs)
-
-mkConsStar :: (ConsStar :<: f) => [Expr f] -> Expr f
-mkConsStar xs = inject (ConsStar xs)
-
-mkIf :: (If :<: f) => Expr f -> Expr f -> Expr f -> Expr f
-mkIf predicate consequent alternate
-    = inject (If predicate consequent alternate)
-
-mkOr :: (Or :<: f) => [Expr f] -> Expr f
-mkOr xs = inject (Or xs)
-
-mkAnd :: (And :<: f) => [Expr f] -> Expr f
-mkAnd xs = inject (And xs)
-
-mkNot :: (Not :<: f) => Expr f -> Expr f
-mkNot x = inject (Not x)
-
-mkCond :: (Cond :<: f) => [(Expr f, Expr f)] -> Expr f
-mkCond branches = inject (Cond branches)
-
-mkLet :: (Let :<: f) => [(Name, Expr f)] -> Expr f -> Expr f
-mkLet bindings body = inject (Let bindings body)
-
-mkLetrecOneArg :: (LetrecOneArg :<: f)
-	       => [(Name, Name, Expr f)] -> Expr f -> Expr f
-mkLetrecOneArg bindings body
-    = inject (LetrecOneArg bindings body)
-
-mkLetrecManyArgs :: (LetrecManyArgs :<: f)
-		 => [(Name, [Name], Expr f)] -> Expr f -> Expr f
-mkLetrecManyArgs bindings body
-    = inject (LetrecManyArgs bindings body)
+$(defineSmartConstructors [ ''Variable
+			  , ''LambdaOneArg
+			  , ''LambdaManyArgs
+			  , ''ApplicationOneArg
+			  , ''ApplicationManyArgs
+			  , ''Cons
+			  , ''List
+			  , ''ConsStar
+			  , ''If
+			  , ''Or
+			  , ''And
+			  , ''Not
+			  , ''Cond
+			  , ''Let
+			  , ''LetrecOneArg
+			  , ''LetrecManyArgs
+			  ])
 
 -- Free variables
 freeVariables :: FreeVariables f => Expr f -> Set Name
