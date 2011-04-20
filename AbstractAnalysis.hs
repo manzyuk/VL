@@ -19,6 +19,8 @@ import VL.Common
 import VL.Expression
 import VL.AbstractValue
 
+import qualified VL.Environment as Environment
+
 import Prelude hiding (lookup)
 
 import Data.Map (Map)
@@ -26,7 +28,7 @@ import qualified Data.Map as Map
 
 newtype AbstractAnalysis
     = AbstractAnalysis {
-        bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
+	bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
       } deriving Eq
 
 empty :: AbstractAnalysis
@@ -55,6 +57,9 @@ domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
+-- values a = concat [ v : Environment.values env
+-- 		  | ((e, env), v) <- Map.toList (bindings a)
+-- 		  ]
 values = Map.elems . bindings
 
 expand :: CoreExpression
@@ -74,7 +79,7 @@ toList :: AbstractAnalysis -> [((CoreExpression, AbstractEnvironment), AbstractV
 toList = Map.toList . bindings
 
 singleton :: CoreExpression
-          -> AbstractEnvironment
-          -> AbstractValue
-          -> AbstractAnalysis
+	  -> AbstractEnvironment
+	  -> AbstractValue
+	  -> AbstractAnalysis
 singleton e env v = AbstractAnalysis $ Map.singleton (e, env) v

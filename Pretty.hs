@@ -37,82 +37,82 @@ instance Display Variable where
 
 instance Display LambdaOneArg where
     displayAlg (LambdaOneArg arg body)
-        = parens $ hang (text "lambda" <+> parens (text arg)) 1 body
+	= parens $ hang (text "lambda" <+> parens (text arg)) 1 body
 
 instance Display LambdaManyArgs where
     displayAlg (LambdaManyArgs args body)
-        = parens $ hang (text "lambda" <+> parens (sepMap text args)) 1 body
+	= parens $ hang (text "lambda" <+> parens (sepMap text args)) 1 body
 
 instance Display ApplicationOneArg where
     displayAlg (ApplicationOneArg operator operand)
-        = parens $ sep [operator, operand]
+	= parens $ sep [operator, operand]
 
 instance Display ApplicationManyArgs where
     displayAlg (ApplicationManyArgs operator operands)
-        = parens $ sep (operator : operands)
+	= parens $ sep (operator : operands)
 
 instance Display Cons where
     displayAlg (Cons x1 x2)
-        = parens $ sep [text "cons", x1, x2]
+	= parens $ sep [text "cons", x1, x2]
 
 instance Display List where
     displayAlg (List xs)
-        = parens $ sep (text "list" : xs)
+	= parens $ sep (text "list" : xs)
 
 instance Display ConsStar where
     displayAlg (ConsStar xs)
-        = parens $ sep (text "cons*" : xs)
+	= parens $ sep (text "cons*" : xs)
 
 instance Display If where
     displayAlg (If predicate consequent alternate)
-        = parens $ sep [text "if", predicate, consequent, alternate]
+	= parens $ sep [text "if", predicate, consequent, alternate]
 
 instance Display Or where
     displayAlg (Or xs)
-        = parens $ sep (text "or" : xs)
+	= parens $ sep (text "or" : xs)
 
 instance Display And where
     displayAlg (And xs)
-        = parens $ sep (text "and" : xs)
+	= parens $ sep (text "and" : xs)
 
 instance Display Not where
     displayAlg (Not x)
-        = parens $ sep [text "not", x]
+	= parens $ sep [text "not", x]
 
 instance Display Cond where
     displayAlg (Cond clauses)
-        = parens $ sep (text "cond" : map ppClause clauses)
-        where
-          ppClause (test, expression) = parens $ sep [test, expression]
+	= parens $ sep (text "cond" : map ppClause clauses)
+	where
+	  ppClause (test, expression) = parens $ sep [test, expression]
 
 instance Display Let where
     displayAlg (Let bindings body)
-        = parens $ sep [ text "let"
-                       , parens . sepMap ppBinding $ bindings
-                       , body
-                       ]
-        where
-          ppBinding (name, expression)
-              = parens $ sep [text name, expression]
+	= parens $ sep [ text "let"
+		       , parens . sepMap ppBinding $ bindings
+		       , body
+		       ]
+	where
+	  ppBinding (name, expression)
+	      = parens $ sep [text name, expression]
 
 instance Display LetrecOneArg where
     displayAlg (LetrecOneArg bindings body)
-        = parens $ sep [ text "letrec"
-                       , parens . sepMap ppBinding $ bindings
-                       , body
-                       ]
-        where
-          ppBinding (name, arg, body)
-              = parens $ hang (text name <+> parens (text arg)) 1 body
+	= parens $ sep [ text "letrec"
+		       , parens . sepMap ppBinding $ bindings
+		       , body
+		       ]
+	where
+	  ppBinding (name, arg, body)
+	      = parens $ hang (text name <+> parens (text arg)) 1 body
 
 instance Display LetrecManyArgs where
     displayAlg (LetrecManyArgs bindings body)
-        = parens $ sep [ text "letrec"
-                       , parens . sepMap ppBinding $ bindings
-                       , body]
-        where
-          ppBinding (name, args, body)
-              = parens $ hang (text name <+> parens (sepMap text args)) 1 body
+	= parens $ sep [ text "letrec"
+		       , parens . sepMap ppBinding $ bindings
+		       , body]
+	where
+	  ppBinding (name, args, body)
+	      = parens $ hang (text name <+> parens (sepMap text args)) 1 body
 
 sepMap :: (a -> Doc) -> [a] -> Doc
 sepMap f = sep . map f
@@ -177,8 +177,8 @@ prim = internal "primitive" . text
 -- Pretty-printing of environments
 instance Pretty val => Pretty (Environment val) where
     pp = parens . sep . map ppBinding . Environment.bindings
-        where
-          ppBinding (x, v) = ppPair x v
+	where
+	  ppBinding (x, v) = ppPair x v
 
 ppClosure :: Pretty val => Environment val -> Name -> CoreExpression -> Doc
 ppClosure env x b = internal "closure" $ pp env $+$ pp (mkLambdaOneArg x b)
@@ -203,16 +203,16 @@ instance Pretty AbstractValue where
 -- Pretty-printing of analyses
 instance Pretty AbstractAnalysis where
     pp analysis = internal "analysis" bindings
-        where
-          bindings = vcat
-                   . punctuate newline
-                   . map ppBinding
-                   . Analysis.toList
-                   $ analysis
-          ppBinding ((e, env), v) = sep [ ppPair e env
-                                        , text "==>"
-                                        , pp v
-                                        ]
+	where
+	  bindings = vcat
+		   . punctuate newline
+		   . map ppBinding
+		   . Analysis.toList
+		   $ analysis
+	  ppBinding ((e, env), v) = sep [ ppPair e env
+					, text "==>"
+					, pp v
+					]
 
 dot, newline :: Doc
 dot     = char '.'
