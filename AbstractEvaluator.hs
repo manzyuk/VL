@@ -354,14 +354,17 @@ analyze' (expression, constants)
     = iterateUntilStable amendAnalysis analysis0
     where
       analysis0   = Analysis.singleton expression environment AbstractBottom
-      environment = Environment.map AbstractScalar
-                  $ primitives `Environment.union` constants
+      environment = initialAbstractEnvironment constants
 
 iterateUntilStable :: Eq a => (a -> a) -> a -> [a]
 iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
     where
       ys = iterate f x
       zs = zip ys (tail ys)
+
+initialAbstractEnvironment :: ScalarEnvironment -> AbstractEnvironment
+initialAbstractEnvironment constants
+    = Environment.map AbstractScalar $ primitives `Environment.union` constants
 
 read :: String -> (CoreExpression, ScalarEnvironment)
 read = first prepare . parse
@@ -370,8 +373,7 @@ interpretMinimal :: String -> String
 interpretMinimal input = pprint output
     where
       (expression, constants) = read input
-      environment = Environment.map AbstractScalar
-                  $ primitives `Environment.union` constants
+      environment = initialAbstractEnvironment constants
       analysis    = analyze (expression, constants)
       output      = Analysis.lookup expression environment analysis
 
