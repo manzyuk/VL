@@ -1,5 +1,11 @@
 {-# LANGUAGE TypeOperators, FlexibleContexts #-}
-module VL.Uniquify (uniquify) where
+module VL.Uniquify
+    ( Supply
+    , evalSupply
+    , freshName
+    , uniquify
+    )
+    where
 
 import VL.Common
 import VL.Coproduct
@@ -59,6 +65,9 @@ instance (Rename f, Rename g) => Rename (f :+: g) where
 -- Uniquification: making bound variables unique
 type Supply = State Int
 
+evalSupply :: Supply a -> a
+evalSupply = flip evalState 0
+
 freshName :: Name -> Supply Name
 freshName prefix = do i <- get
                       let name = prefix ++ show i
@@ -69,7 +78,7 @@ freshVarName :: Supply Name
 freshVarName = freshName "#:var-"
 
 uniquify :: CoreExpression -> CoreExpression
-uniquify = flip evalState 0 . foldExpr uniquifyAlg
+uniquify = evalSupply . foldExpr uniquifyAlg
 
 class Functor f => Uniquify f where
     uniquifyAlg :: f (Supply CoreExpression) -> Supply CoreExpression
