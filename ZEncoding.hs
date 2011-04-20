@@ -59,7 +59,6 @@ zencodeChar c = fromMaybe (error msg) (Map.lookup c table)
               , ('+', "zp")
               , ('-', "zm")
               , ('.', "zi")
-              , ('@', "z
-A") -- /A/t sign
+              , ('@', "zA") -- /A/t sign
               , ('#', "zh")
               ]
