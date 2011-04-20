@@ -4,6 +4,7 @@ module VL.Environment
     , empty
     , union
     , domain
+    , values
     , lookup
     , insert
     , update
@@ -35,6 +36,9 @@ union env1 env2 = Environment (bindings env1 `List.union` bindings env2)
 
 domain :: Environment val -> [Name]
 domain env = [x | (x, v) <- bindings env]
+
+values :: Environment val -> [val]
+values env = [v | (x, v) <- bindings env]
 
 lookup :: Name -> Environment val -> val
 lookup x env
