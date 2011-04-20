@@ -36,6 +36,8 @@ cata f (In t) = f (fmap (cata f) t)
 inject :: (g :<: f) => g (Fix f) -> Fix f
 inject = In . inj
 
+-- Template Haskell macros
+
 -- Define smart constructors for a list of given type names.
 --
 -- The smart constructor applies the data constructor to its arguments
