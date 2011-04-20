@@ -1,4 +1,4 @@
-module VL.ZEncoding where
+module VL.ZEncoding (zencode) where
 
 -- Z-encoding.  See http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/SymbolNames.
 
@@ -59,6 +59,7 @@ zencodeChar c = fromMaybe (error msg) (Map.lookup c table)
               , ('+', "zp")
               , ('-', "zm")
               , ('.', "zi")
-              , ('@', "zA") -- /A/t sign
+              , ('@', "z
+A") -- /A/t sign
               , ('#', "zh")
               ]
