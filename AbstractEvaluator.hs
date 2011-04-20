@@ -17,7 +17,7 @@ import qualified VL.AbstractAnalysis as Analysis
 
 import VL.Parser
 import VL.Pretty
-import VL.Desugar
+import VL.Prepare
 
 import Prelude hiding (read)
 

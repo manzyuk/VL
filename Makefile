@@ -16,6 +16,8 @@ test: Test.hs
 		ConcreteEvaluator.hs \
 		Coproduct.hs \
 		Desugar.hs \
+		Prepare.hs \
+		Uniquify.hs \
 		FixedPoint.hs \
 	-threaded -o test && ./test
 
