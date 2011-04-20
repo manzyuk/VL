@@ -97,6 +97,6 @@ defineAlgebra algebra con = funD algebra clauses
 generateNames :: Con -> (Name, Name, [Name])
 generateNames (NormalC name args) = (name, name', vars)
     where
-      name' = mkName $ "mk" ++ nameBase name
-      vars  = [mkName $ "x" ++ show i | (i, _) <- zip [1..] args]
+      name' = mkName ('m' : 'k' : nameBase name)
+      vars  = [mkName ('x' : show i) | (i, _) <- zip [1..] args]
 generateNames _ = error "generateNames: the argument is not a normal constructor"

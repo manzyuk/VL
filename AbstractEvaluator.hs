@@ -26,16 +26,16 @@ import Data.Maybe (isJust)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Control.Arrow ((***))
+import Control.Arrow (first)
 
 import Control.Monad (forever)
 import System.IO
 import Control.Exception
 
 refineApply :: AbstractValue
-	    -> AbstractValue
-	    -> AbstractAnalysis
-	    -> AbstractValue
+            -> AbstractValue
+            -> AbstractAnalysis
+            -> AbstractValue
 refineApply (AbstractClosure env x e) v a
     | v /= AbstractBottom
     = Analysis.lookup e (Environment.insert x v env) a
@@ -47,9 +47,9 @@ refineApply AbstractBottom _ _ = AbstractBottom
 refineApply _ _ _ = error "refineApply: can't refine an abstract non-function"
 
 refinePrimitive :: Primitive
-		-> AbstractAnalysis
-		-> AbstractValue
-		-> AbstractValue
+                -> AbstractAnalysis
+                -> AbstractValue
+                -> AbstractValue
 refinePrimitive Car   _ = primCar
 refinePrimitive Cdr   _ = primCdr
 refinePrimitive Add   _ = arithmetic (+)
@@ -109,7 +109,7 @@ dyadic op _ = error "dyadic: provably a non-pair where a pair is expected"
 data Abstraction a
     = Abstraction {
       -- view a concrete value of type a as an abstract value
-	convert  :: a -> AbstractValue
+        convert  :: a -> AbstractValue
       -- try to extract a value of type a from an abstract value
       , extract  :: AbstractValue -> Maybe a
       -- abstract value corresponding to concrete values of type a
@@ -118,17 +118,17 @@ data Abstraction a
 
 float :: Abstraction Float
 float = Abstraction {
-	  convert  = AbstractScalar . Real
-	, extract  = maybeReal
-	, abstract = AbstractReal
-	}
+          convert  = AbstractScalar . Real
+        , extract  = maybeReal
+        , abstract = AbstractReal
+        }
     where
       maybeReal (AbstractScalar (Real r)) = Just r
       maybeReal _                         = Nothing
 
 bool :: Abstraction Bool
 bool = Abstraction {
-	 convert  = AbstractScalar . Boolean
+         convert  = AbstractScalar . Boolean
        , extract  = maybeBoolean
        , abstract = AbstractBoolean
        }
@@ -153,8 +153,8 @@ liftOp a b c op x y
     | otherwise
     = convert c (u `op` v)
       where
-	Just u = extract a x
-	Just v = extract b y
+        Just u = extract a x
+        Just v = extract b y
 
 arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
 arithmetic op = dyadic $ liftOp float float float op
@@ -170,13 +170,13 @@ unary _ _ = error "unary: provably a non-real where some real is expected"
 
 refineIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
 refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
-			     (AbstractPair t e))
+                             (AbstractPair t e))
     | c
     = refineThunk t a
     | otherwise
     = refineThunk e a
 refineIfProc a (AbstractPair AbstractBoolean
-			     (AbstractPair t e))
+                             (AbstractPair t e))
     = (refineThunk t a) `joinValues` (refineThunk e a)
 refineIfProc a AbstractBottom
     = AbstractBottom
@@ -213,14 +213,14 @@ primReal _ = error "primReal: the argument is not some real"
 
 class RefineEvalCoreExpr f where
     refineEvalCoreExpr :: f CoreExpression
-		       -> AbstractEnvironment
-		       -> AbstractAnalysis
-		       -> AbstractValue
+                       -> AbstractEnvironment
+                       -> AbstractAnalysis
+                       -> AbstractValue
 
 refineEval :: CoreExpression
-	   -> AbstractEnvironment
-	   -> AbstractAnalysis
-	   -> AbstractValue
+           -> AbstractEnvironment
+           -> AbstractAnalysis
+           -> AbstractValue
 refineEval (In t) = refineEvalCoreExpr t
 
 instance RefineEvalCoreExpr Variable where
@@ -228,39 +228,39 @@ instance RefineEvalCoreExpr Variable where
 
 instance RefineEvalCoreExpr LambdaOneArg where
     refineEvalCoreExpr (LambdaOneArg arg body) env a
-	= AbstractClosure env' arg body
-	where
-	  fvs  = Set.delete arg (freeVariables body)
-	  env' = Environment.restrict fvs env
+        = AbstractClosure env' arg body
+        where
+          fvs  = Set.delete arg (freeVariables body)
+          env' = Environment.restrict fvs env
 
 instance RefineEvalCoreExpr ApplicationOneArg where
     refineEvalCoreExpr (ApplicationOneArg operator operand) env a
-	= refineApply (Analysis.lookup operator env a)
-		      (Analysis.lookup operand  env a) a
+        = refineApply (Analysis.lookup operator env a)
+                      (Analysis.lookup operand  env a) a
 
 instance RefineEvalCoreExpr Cons where
     refineEvalCoreExpr (Cons e1 e2) env a
-	| v1 /= AbstractBottom && v2 /= AbstractBottom
-	= AbstractPair v1 v2
-	| otherwise
-	= AbstractBottom
-	where
-	  v1 = Analysis.lookup e1 env a
-	  v2 = Analysis.lookup e2 env a
+        | v1 /= AbstractBottom && v2 /= AbstractBottom
+        = AbstractPair v1 v2
+        | otherwise
+        = AbstractBottom
+        where
+          v1 = Analysis.lookup e1 env a
+          v2 = Analysis.lookup e2 env a
 
 instance RefineEvalCoreExpr LetrecOneArg where
     refineEvalCoreExpr (LetrecOneArg bindings body) env a
-	= refineEval (pushLetrec bindings body) env a
+        = refineEval (pushLetrec bindings body) env a
 
 instance (RefineEvalCoreExpr f, RefineEvalCoreExpr g) =>
     RefineEvalCoreExpr (f :+: g) where
-	refineEvalCoreExpr (Inl x) = refineEvalCoreExpr x
-	refineEvalCoreExpr (Inr x) = refineEvalCoreExpr x
+        refineEvalCoreExpr (Inl x) = refineEvalCoreExpr x
+        refineEvalCoreExpr (Inr x) = refineEvalCoreExpr x
 
 expandApply :: AbstractValue
-	    -> AbstractValue
-	    -> AbstractAnalysis
-	    -> AbstractAnalysis
+            -> AbstractValue
+            -> AbstractAnalysis
+            -> AbstractAnalysis
 expandApply (AbstractClosure env x e) v a
     | v /= AbstractBottom
     = Analysis.expand e (Environment.insert x v env) a
@@ -272,21 +272,21 @@ expandApply AbstractBottom _ _ = Analysis.empty
 expandApply _ _ _ = error "expandApply: can't expand an abstract non-function"
 
 expandPrimitive :: Primitive
-		-> AbstractValue
-		-> AbstractAnalysis
-		-> AbstractAnalysis
+                -> AbstractValue
+                -> AbstractAnalysis
+                -> AbstractAnalysis
 expandPrimitive IfProc v a = expandIfProc v a
 expandPrimitive _ _ _      = Analysis.empty
 
 expandIfProc :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandIfProc (AbstractPair (AbstractScalar (Boolean c))
-			   (AbstractPair t e)) a
+                           (AbstractPair t e)) a
     | c
     = expandThunk t a
     | otherwise
     = expandThunk e a
 expandIfProc (AbstractPair AbstractBoolean
-			   (AbstractPair t e)) a
+                           (AbstractPair t e)) a
     = (expandThunk t a) `Analysis.union` (expandThunk e a)
 expandIfProc AbstractBottom _
     = Analysis.empty
@@ -301,14 +301,14 @@ expandThunk _ _ = error "expandThunk: the argument is not a thunk"
 
 class ExpandEvalCoreExpr f where
     expandEvalCoreExpr :: f CoreExpression
-		       -> AbstractEnvironment
-		       -> AbstractAnalysis
-		       -> AbstractAnalysis
+                       -> AbstractEnvironment
+                       -> AbstractAnalysis
+                       -> AbstractAnalysis
 
 expandEval :: CoreExpression
-	   -> AbstractEnvironment
-	   -> AbstractAnalysis
-	   -> AbstractAnalysis
+           -> AbstractEnvironment
+           -> AbstractAnalysis
+           -> AbstractAnalysis
 expandEval (In t) = expandEvalCoreExpr t
 
 instance ExpandEvalCoreExpr Variable where
@@ -319,31 +319,31 @@ instance ExpandEvalCoreExpr LambdaOneArg where
 
 instance ExpandEvalCoreExpr ApplicationOneArg where
     expandEvalCoreExpr (ApplicationOneArg operator operand) env a
-	= Analysis.unions
-	  [ Analysis.expand operator env a
-	  , Analysis.expand operand  env a
-	  , expandApply (Analysis.lookup operator env a)
-			(Analysis.lookup operand  env a) a
-	  ]
+        = Analysis.unions
+          [ Analysis.expand operator env a
+          , Analysis.expand operand  env a
+          , expandApply (Analysis.lookup operator env a)
+                        (Analysis.lookup operand  env a) a
+          ]
 
 instance ExpandEvalCoreExpr Cons where
     expandEvalCoreExpr (Cons e1 e2) env a
-	= (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
+        = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
 
 instance ExpandEvalCoreExpr LetrecOneArg where
     expandEvalCoreExpr (LetrecOneArg bindings body) env a
-	= expandEval (pushLetrec bindings body) env a
+        = expandEval (pushLetrec bindings body) env a
 
 instance (ExpandEvalCoreExpr f, ExpandEvalCoreExpr g) =>
     ExpandEvalCoreExpr (f :+: g) where
-	expandEvalCoreExpr (Inl x) = expandEvalCoreExpr x
-	expandEvalCoreExpr (Inr x) = expandEvalCoreExpr x
+        expandEvalCoreExpr (Inl x) = expandEvalCoreExpr x
+        expandEvalCoreExpr (Inr x) = expandEvalCoreExpr x
 
 amendAnalysis :: AbstractAnalysis -> AbstractAnalysis
 amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
     where
       amendBinding (e, env)
-	  = Analysis.insert e env (refineEval e env a) (expandEval e env a)
+          = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
 analyze :: (CoreExpression, ScalarEnvironment) -> AbstractAnalysis
@@ -355,7 +355,7 @@ analyze' (expression, constants)
     where
       analysis0   = Analysis.singleton expression environment AbstractBottom
       environment = Environment.map AbstractScalar
-		  $ primitives `Environment.union` constants
+                  $ primitives `Environment.union` constants
 
 iterateUntilStable :: Eq a => (a -> a) -> a -> [a]
 iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
@@ -364,14 +364,14 @@ iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
       zs = zip ys (tail ys)
 
 read :: String -> (CoreExpression, ScalarEnvironment)
-read = (prepare *** id) . parse
+read = first prepare . parse
 
 interpretMinimal :: String -> String
 interpretMinimal input = pprint output
     where
       (expression, constants) = read input
       environment = Environment.map AbstractScalar
-		  $ primitives `Environment.union` constants
+                  $ primitives `Environment.union` constants
       analysis    = analyze (expression, constants)
       output      = Analysis.lookup expression environment analysis
 
@@ -395,12 +395,12 @@ interpreter verbosity = do
   forever . handle (\e -> print (e :: ErrorCall)) $ repl
     where
       repl = do
-	putStr prompt
-	input <- getLine
-	putStrLn $ interpret input
+        putStr prompt
+        input <- getLine
+        putStrLn $ interpret input
 
       prompt = "vl> "
       interpret = case verbosity of
-		    Minimal -> interpretMinimal
-		    Compact -> interpretCompact
-		    Verbose -> interpretVerbose
+                    Minimal -> interpretMinimal
+                    Compact -> interpretCompact
+                    Verbose -> interpretVerbose
