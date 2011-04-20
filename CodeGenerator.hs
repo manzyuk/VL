@@ -68,9 +68,14 @@ data CDecl
 type CProg = [CDecl]
 
 -- Pretty-printing
+
+-- Lay out items of a list in a raw, pretty-printing each item with
+-- a supplied printer and separating by commas.
 raw :: (a -> Doc) -> [a] -> Doc
 raw printer = hsep . punctuate comma . map printer
 
+-- Lay out items of a list in a column, pretty-printing each with a
+-- supplied printer.
 col :: (a -> Doc) -> [a] -> Doc
 col printer = vcat . map printer
 
