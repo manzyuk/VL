@@ -65,8 +65,8 @@ freshName prefix = do i <- get
                       put (succ i)
                       return name
 
-tempName :: Supply Name
-tempName = freshName "#:temp-"
+freshVarName :: Supply Name
+freshVarName = freshName "#:var-"
 
 uniquify :: CoreExpression -> CoreExpression
 uniquify = flip evalState 0 . foldExpr uniquifyAlg
@@ -84,7 +84,7 @@ instance Uniquify LambdaOneArg where
 
 uniquifyLambda :: Name -> Supply CoreExpression -> Supply (Name, CoreExpression)
 uniquifyLambda arg body
-    = do x <- tempName
+    = do x <- freshVarName
          b <- body
          return (x, rename (Map.singleton arg x) b)
 
@@ -97,7 +97,7 @@ instance Uniquify Cons where
 
 instance Uniquify LetrecOneArg where
     uniquifyAlg (LetrecOneArg bindings body)
-        = do vs' <- sequence [ tempName           | v      <- vs ]
+        = do vs' <- sequence [ freshVarName       | v      <- vs ]
              ls' <- sequence [ uniquifyLambda u e | (u, e) <- ls ]
              b   <- body
              let dict = Map.fromList $ zip vs vs'
