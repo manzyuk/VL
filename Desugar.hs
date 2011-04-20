@@ -307,11 +307,14 @@ instance (Rename f, Rename g) => Rename (f :+: g) where
 -- Uniquification: making bound variables unique
 type Supply = State Int
 
-freshName :: Supply Name
-freshName = do i <- get
-               let name = "#:temp-" ++ show i
-               put (succ i)
-               return name
+freshName :: Name -> Supply Name
+freshName prefix = do i <- get
+                      let name = prefix ++ show i
+                      put (succ i)
+                      return name
+
+tempName :: Supply Name
+tempName = freshName "#:temp-"
 
 uniquify :: CoreExpression -> CoreExpression
 uniquify = flip evalState 0 . foldExpr uniquifyAlg
@@ -329,7 +332,7 @@ instance Uniquify LambdaOneArg where
 
 uniquifyLambda :: Name -> Supply CoreExpression -> Supply (Name, CoreExpression)
 uniquifyLambda arg body
-    = do x <- freshName
+    = do x <- tempName
          b <- body
          return (x, rename (Map.singleton arg x) b)
 
@@ -342,7 +345,7 @@ instance Uniquify Cons where
 
 instance Uniquify LetrecOneArg where
     uniquifyAlg (LetrecOneArg bindings body)
-        = do vs' <- sequence [ freshName          | v      <- vs ]
+        = do vs' <- sequence [ tempName           | v      <- vs ]
              ls' <- sequence [ uniquifyLambda u e | (u, e) <- ls ]
              b   <- body
              let dict = Map.fromList $ zip vs vs'
