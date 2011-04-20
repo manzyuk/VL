@@ -6,6 +6,7 @@ module VL.AbstractAnalysis
     , lookup
     , insert
     , domain
+    , values
     , expand
     , member
     , toList
@@ -52,6 +53,9 @@ insert e env v a = AbstractAnalysis $ Map.insert (e, env) v (bindings a)
 
 domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
 domain = Map.keys . bindings
+
+values :: AbstractAnalysis -> [AbstractValue]
+values = Map.elems . bindings
 
 expand :: CoreExpression
        -> AbstractEnvironment
