@@ -16,6 +16,7 @@ module VL.Language.Environment
     where
 
 import VL.Language.Common
+import VL.Language.Pretty
 
 import Prelude hiding (map, lookup)
 import qualified Data.List as List
@@ -66,3 +67,9 @@ singleton x v = Environment [(x, v)]
 
 map :: (val1 -> val2) -> Environment val1 -> Environment val2
 map f = Environment . List.map (second f) . bindings
+
+-- Pretty-printing of environments
+instance Pretty val => Pretty (Environment val) where
+    pp = parens . sep . List.map ppBinding . bindings
+	where
+	  ppBinding (x, v) = ppPair x v

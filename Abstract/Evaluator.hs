@@ -115,13 +115,13 @@ data Abstraction a
       , abstract :: AbstractValue
       }
 
-float :: Abstraction Float
-float = Abstraction {
-	  name     = "Float"
-	, convert  = AbstractScalar . Real
-	, extract  = maybeReal
-	, abstract = AbstractReal
-	}
+real :: Abstraction Float
+real = Abstraction {
+	 name     = "Real"
+       , convert  = AbstractScalar . Real
+       , extract  = maybeReal
+       , abstract = AbstractReal
+       }
     where
       maybeReal (AbstractScalar (Real r)) = Just r
       maybeReal _                         = Nothing
@@ -162,10 +162,10 @@ liftOp a b c op x y
 	Just v = extract b y
 
 arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
-arithmetic op = dyadic $ liftOp float float float op
+arithmetic op = dyadic $ liftOp real real real op
 
 comparison :: (Float -> Float -> Bool) -> AbstractValue -> AbstractValue
-comparison op = dyadic $ liftOp float float bool op
+comparison op = dyadic $ liftOp real real bool op
 
 unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))

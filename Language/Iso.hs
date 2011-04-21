@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeOperators #-}
-module VL.Language.Iso (iso, osi) where
+module VL.Language.Iso (iso) where
 
 import VL.Language.Syntax
 import VL.Language.Expression
@@ -34,15 +34,3 @@ instance Iso LetrecOneArg where
 instance (Iso f, Iso g) => Iso (f :+: g) where
     isoAlg (Inl x) = isoAlg x
     isoAlg (Inr x) = isoAlg x
-
-osi :: CoreExpr -> CoreSyntax
-osi (Var x)
-    = mkVariable x
-osi (Lam formal body)
-    = mkLambdaOneArg formal (osi body)
-osi (App operator operand)
-    = mkApplicationOneArg (osi operator) (osi operand)
-osi (Pair car cdr)
-    = mkCons (osi car) (osi cdr)
-osi (Letrec bindings body)
-    = mkLetrecOneArg [ (v, u, osi e) | (v, u, e) <- bindings ] (osi body)

@@ -16,6 +16,7 @@ module VL.Abstract.Analysis
     where
 
 import VL.Language.Common
+import VL.Language.Pretty
 import VL.Language.Expression
 import qualified VL.Language.Environment as Environment
 
@@ -57,9 +58,6 @@ domain :: AbstractAnalysis -> [(CoreExpr, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
--- values a = concat [ v : Environment.values env
--- 		  | ((e, env), v) <- Map.toList (bindings a)
--- 		  ]
 values = Map.elems . bindings
 
 expand :: CoreExpr
@@ -83,3 +81,17 @@ singleton :: CoreExpr
 	  -> AbstractValue
 	  -> AbstractAnalysis
 singleton e env v = AbstractAnalysis $ Map.singleton (e, env) v
+
+-- Pretty-printing of analyses
+instance Pretty AbstractAnalysis where
+    pp analysis = internal "analysis" bindings
+	where
+	  bindings = vcat
+		   . punctuate newline
+		   . map ppBinding
+		   . toList
+		   $ analysis
+	  ppBinding ((e, env), v) = sep [ ppPair e env
+					, text "==>"
+					, pp v
+					]

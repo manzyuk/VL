@@ -2,6 +2,7 @@ module VL.Abstract.Value where
 
 import VL.Language.Common
 import VL.Language.Scalar
+import VL.Language.Pretty
 import VL.Language.Expression
 import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment
@@ -73,3 +74,12 @@ isSomeBoolean _                            = False
 isSomeReal    (AbstractScalar (Real _))    = True
 isSomeReal    AbstractReal                 = True
 isSomeReal    _                            = False
+
+-- Pretty-printing of abstract values
+instance Pretty AbstractValue where
+    pp (AbstractScalar s)        = pp s
+    pp AbstractBoolean           = text "B"
+    pp AbstractReal              = text "R"
+    pp AbstractBottom            = text "_|_"
+    pp (AbstractClosure env x b) = ppClosure env x b
+    pp (AbstractPair v1 v2)      = ppPair v1 v2
