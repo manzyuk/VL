@@ -16,7 +16,7 @@ module VL.AbstractAnalysis
     where
 
 import VL.Common
-import VL.Syntax
+import VL.Expression
 import VL.AbstractValue
 
 import qualified VL.Environment as Environment
@@ -28,7 +28,7 @@ import qualified Data.Map as Map
 
 newtype AbstractAnalysis
     = AbstractAnalysis {
-	bindings :: Map (CoreExpression, AbstractEnvironment) AbstractValue
+	bindings :: Map (CoreExpr, AbstractEnvironment) AbstractValue
       } deriving Eq
 
 empty :: AbstractAnalysis
@@ -40,20 +40,20 @@ union a1 a2 = AbstractAnalysis $ Map.union (bindings a1) (bindings a2)
 unions :: [AbstractAnalysis] -> AbstractAnalysis
 unions = foldl union empty
 
-lookup :: CoreExpression
+lookup :: CoreExpr
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractValue
 lookup e env a = fromMaybe AbstractBottom (Map.lookup (e, env) (bindings a))
 
-insert :: CoreExpression
+insert :: CoreExpr
        -> AbstractEnvironment
        -> AbstractValue
        -> AbstractAnalysis
        -> AbstractAnalysis
 insert e env v a = AbstractAnalysis $ Map.insert (e, env) v (bindings a)
 
-domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
+domain :: AbstractAnalysis -> [(CoreExpr, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
@@ -62,7 +62,7 @@ values :: AbstractAnalysis -> [AbstractValue]
 -- 		  ]
 values = Map.elems . bindings
 
-expand :: CoreExpression
+expand :: CoreExpr
        -> AbstractEnvironment
        -> AbstractAnalysis
        -> AbstractAnalysis
@@ -72,13 +72,13 @@ expand e env a
     | otherwise
     = singleton e env AbstractBottom
 
-member :: (CoreExpression, AbstractEnvironment) -> AbstractAnalysis -> Bool
+member :: (CoreExpr, AbstractEnvironment) -> AbstractAnalysis -> Bool
 member (e, env) a = (e, env) `Map.member` (bindings a)
 
-toList :: AbstractAnalysis -> [((CoreExpression, AbstractEnvironment), AbstractValue)]
+toList :: AbstractAnalysis -> [((CoreExpr, AbstractEnvironment), AbstractValue)]
 toList = Map.toList . bindings
 
-singleton :: CoreExpression
+singleton :: CoreExpr
 	  -> AbstractEnvironment
 	  -> AbstractValue
 	  -> AbstractAnalysis

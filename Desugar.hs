@@ -18,11 +18,11 @@ type Stage1  =  Variable
 	    :+: Let
 	    :+: LetrecManyArgs
 
-elimConditionals :: Expr Surface -> Expr Stage1
-elimConditionals = foldExpr elimConditionalsAlg
+elimConditionals :: Syntax Surface -> Syntax Stage1
+elimConditionals = foldSyntax elimConditionalsAlg
 
 class Functor f => ElimConditionals f where
-    elimConditionalsAlg :: f(Expr Stage1) -> Expr Stage1
+    elimConditionalsAlg :: f(Syntax Stage1) -> Syntax Stage1
 
 $(deriveAlgebraInstances ''ElimConditionals
   [ ''Variable
@@ -69,11 +69,11 @@ type Stage2  =  Variable
 	    :+: Let
 	    :+: LetrecManyArgs
 
-elimIf :: Expr Stage1 -> Expr Stage2
-elimIf = foldExpr elimIfAlg
+elimIf :: Syntax Stage1 -> Syntax Stage2
+elimIf = foldSyntax elimIfAlg
 
 class Functor f => ElimIf f where
-    elimIfAlg :: f (Expr Stage2) -> Expr Stage2
+    elimIfAlg :: f (Syntax Stage2) -> Syntax Stage2
 
 $(deriveAlgebraInstances ''ElimIf
   [ ''Variable
@@ -106,11 +106,11 @@ type Stage3  =  Variable
 	    :+: ConsStar
 	    :+: LetrecManyArgs
 
-elimLet :: Expr Stage2 -> Expr Stage3
-elimLet = foldExpr elimLetAlg
+elimLet :: Syntax Stage2 -> Syntax Stage3
+elimLet = foldSyntax elimLetAlg
 
 class Functor f => ElimLet f where
-    elimLetAlg :: f (Expr Stage3) -> Expr Stage3
+    elimLetAlg :: f (Syntax Stage3) -> Syntax Stage3
 
 $(deriveAlgebraInstances ''ElimLet
   [ ''Variable
@@ -141,11 +141,11 @@ type Stage4  =  Variable
 	    :+: ConsStar
 	    :+: LetrecOneArg
 
-elimManyArgs :: Expr Stage3 -> Expr Stage4
-elimManyArgs = foldExpr elimManyArgsAlg
+elimManyArgs :: Syntax Stage3 -> Syntax Stage4
+elimManyArgs = foldSyntax elimManyArgsAlg
 
 class Functor f => ElimManyArgs f where
-    elimManyArgsAlg :: f (Expr Stage4) -> Expr Stage4
+    elimManyArgsAlg :: f (Syntax Stage4) -> Syntax Stage4
 
 $(deriveAlgebraInstances ''ElimManyArgs
   [ ''Variable
@@ -176,7 +176,7 @@ instance ElimManyArgs LambdaManyArgs where
 --            e)
 --          (cdr #:args)))
 --       (car #:args)))
-nestLambdas :: [Name] -> Expr Stage4 -> (Name, Expr Stage4)
+nestLambdas :: [Name] -> Syntax Stage4 -> (Name, Syntax Stage4)
 nestLambdas []    body = ("#:ignored", body)
 nestLambdas [arg] body = (arg, body)
 nestLambdas args  body = ("#:args", body'')
@@ -190,7 +190,7 @@ nestLambdas args  body = ("#:args", body'')
       with x v e    = mkApplicationOneArg (mkLambdaOneArg x e) v
 
 cdnr, cadnr :: (ApplicationOneArg :<: f, Variable :<: f)
-	    => Int -> Expr f -> Expr f
+	    => Int -> Syntax f -> Syntax f
 cdnr n = compose (replicate n cdr)
     where
       compose = foldr (.) id
@@ -218,11 +218,11 @@ instance (ElimManyArgs f, ElimManyArgs g) => ElimManyArgs (f :+: g) where
     elimManyArgsAlg (Inr x) = elimManyArgsAlg x
 
 -- Elimination of LIST and CONS*
-elimList :: Expr Stage4 -> Expr Core
-elimList = foldExpr elimListAlg
+elimList :: Syntax Stage4 -> Syntax Core
+elimList = foldSyntax elimListAlg
 
 class Functor f => ElimList f where
-    elimListAlg :: f (Expr Core) -> Expr Core
+    elimListAlg :: f (Syntax Core) -> Syntax Core
 
 $(deriveAlgebraInstances ''ElimList
   [ ''Variable
@@ -247,7 +247,7 @@ instance (ElimList f, ElimList g) => ElimList (f :+: g) where
     elimListAlg (Inl x) = elimListAlg x
     elimListAlg (Inr x) = elimListAlg x
 
-desugar :: SurfaceExpression -> CoreExpression
+desugar :: SurfaceSyntax -> CoreSyntax
 desugar = elimList
 	. elimManyArgs
 	. elimLet

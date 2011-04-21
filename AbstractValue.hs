@@ -2,7 +2,7 @@ module VL.AbstractValue where
 
 import VL.Common
 import VL.Scalar
-import VL.Syntax
+import VL.Expression
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
 
@@ -10,7 +10,7 @@ data AbstractValue
     = AbstractScalar Scalar
     | AbstractBoolean
     | AbstractReal
-    | AbstractClosure AbstractEnvironment Name CoreExpression
+    | AbstractClosure AbstractEnvironment Name CoreExpr
     | AbstractPair AbstractValue AbstractValue
     | AbstractBottom
       deriving (Eq, Ord)

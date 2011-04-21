@@ -81,10 +81,10 @@ keywords = [ "lambda"
 	   , "letrec"
 	   ]
 
-parseVariable :: Parser SurfaceExpression
+parseVariable :: Parser SurfaceSyntax
 parseVariable = mkVariable <$> identifier
 
-parseConstant :: Parser SurfaceExpression
+parseConstant :: Parser SurfaceSyntax
 parseConstant = do s <- try parseEmptyList <|> token maybeConstant
 		   (env, i) <- get
 		   -- (), #t, #f are always converted to the same
@@ -117,7 +117,7 @@ listOf p = parens (many p)
 formals :: Parser [Name]
 formals = listOf identifier
 
-body :: Parser SurfaceExpression
+body :: Parser SurfaceSyntax
 body = expression
 
 -- Expression parsers.
@@ -160,7 +160,7 @@ parseLetrec
 
 parseApplication = liftA2 mkApplicationManyArgs expression (many expression)
 
-expression :: Parser SurfaceExpression
+expression :: Parser SurfaceSyntax
 expression = atom <|> list
     where
       atom = parseVariable <|> parseConstant
@@ -178,7 +178,7 @@ expression = atom <|> list
 	     <|> try parseLetrec
 	     <|> parseApplication
 
-parse :: String -> (SurfaceExpression, ScalarEnvironment)
+parse :: String -> (SurfaceSyntax, ScalarEnvironment)
 parse = ((either (\_ -> error "parse error") id) *** fst)
       . flip runState (initialEnvironment, 0)
       . runParserT expression () ""

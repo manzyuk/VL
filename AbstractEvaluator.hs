@@ -3,8 +3,8 @@ module VL.AbstractEvaluator where
 
 import VL.Common
 import VL.Scalar
-import VL.Syntax
 import VL.Coproduct
+import VL.Expression
 import VL.FixedPoint
 
 import VL.Environment (Environment)
@@ -211,51 +211,28 @@ primReal AbstractReal              = AbstractReal
 primReal AbstractBottom               = AbstractBottom
 primReal _ = error "primReal: the argument is not some real"
 
-class RefineEvalCoreExpr f where
-    refineEvalCoreExpr :: f CoreExpression
-		       -> AbstractEnvironment
-		       -> AbstractAnalysis
-		       -> AbstractValue
-
-refineEval :: CoreExpression
+refineEval :: CoreExpr
 	   -> AbstractEnvironment
 	   -> AbstractAnalysis
 	   -> AbstractValue
-refineEval (In t) = refineEvalCoreExpr t
-
-instance RefineEvalCoreExpr Variable where
-    refineEvalCoreExpr (Variable x) env a = Environment.lookup x env
-
-instance RefineEvalCoreExpr LambdaOneArg where
-    refineEvalCoreExpr (LambdaOneArg arg body) env a
-	= AbstractClosure env' arg body
-	where
-	  fvs  = Set.delete arg (freeVariables body)
-	  env' = Environment.restrict fvs env
-
-instance RefineEvalCoreExpr ApplicationOneArg where
-    refineEvalCoreExpr (ApplicationOneArg operator operand) env a
-	= refineApply (Analysis.lookup operator env a)
-		      (Analysis.lookup operand  env a) a
-
-instance RefineEvalCoreExpr Cons where
-    refineEvalCoreExpr (Cons e1 e2) env a
-	| v1 /= AbstractBottom && v2 /= AbstractBottom
-	= AbstractPair v1 v2
-	| otherwise
-	= AbstractBottom
-	where
-	  v1 = Analysis.lookup e1 env a
-	  v2 = Analysis.lookup e2 env a
-
-instance RefineEvalCoreExpr LetrecOneArg where
-    refineEvalCoreExpr (LetrecOneArg bindings body) env a
-	= refineEval (pushLetrec bindings body) env a
-
-instance (RefineEvalCoreExpr f, RefineEvalCoreExpr g) =>
-    RefineEvalCoreExpr (f :+: g) where
-	refineEvalCoreExpr (Inl x) = refineEvalCoreExpr x
-	refineEvalCoreExpr (Inr x) = refineEvalCoreExpr x
+refineEval (Var x) env a = Environment.lookup x env
+refineEval e@(Lam formal body) env a
+    = AbstractClosure env' formal body
+    where
+      env' = Environment.restrict (freeVariables e) env
+refineEval (App operator operand) env a
+    = refineApply (Analysis.lookup operator env a)
+		  (Analysis.lookup operand  env a) a
+refineEval (Pair e1 e2) env a
+    | v1 /= AbstractBottom && v2 /= AbstractBottom
+    = AbstractPair v1 v2
+    | otherwise
+    = AbstractBottom
+    where
+      v1 = Analysis.lookup e1 env a
+      v2 = Analysis.lookup e2 env a
+refineEval (Letrec bindings body) env a
+    = refineEval (pushLetrec bindings body) env a
 
 expandApply :: AbstractValue
 	    -> AbstractValue
@@ -299,45 +276,23 @@ expandThunk (AbstractClosure env x e) a
     = Analysis.expand e env a
 expandThunk _ _ = error "expandThunk: the argument is not a thunk"
 
-class ExpandEvalCoreExpr f where
-    expandEvalCoreExpr :: f CoreExpression
-		       -> AbstractEnvironment
-		       -> AbstractAnalysis
-		       -> AbstractAnalysis
-
-expandEval :: CoreExpression
+expandEval :: CoreExpr
 	   -> AbstractEnvironment
 	   -> AbstractAnalysis
 	   -> AbstractAnalysis
-expandEval (In t) = expandEvalCoreExpr t
-
-instance ExpandEvalCoreExpr Variable where
-    expandEvalCoreExpr (Variable _) _ _ = Analysis.empty
-
-instance ExpandEvalCoreExpr LambdaOneArg where
-    expandEvalCoreExpr (LambdaOneArg _ _) _ _ = Analysis.empty
-
-instance ExpandEvalCoreExpr ApplicationOneArg where
-    expandEvalCoreExpr (ApplicationOneArg operator operand) env a
-	= Analysis.unions
-	  [ Analysis.expand operator env a
-	  , Analysis.expand operand  env a
-	  , expandApply (Analysis.lookup operator env a)
-			(Analysis.lookup operand  env a) a
-	  ]
-
-instance ExpandEvalCoreExpr Cons where
-    expandEvalCoreExpr (Cons e1 e2) env a
-	= (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
-
-instance ExpandEvalCoreExpr LetrecOneArg where
-    expandEvalCoreExpr (LetrecOneArg bindings body) env a
-	= expandEval (pushLetrec bindings body) env a
-
-instance (ExpandEvalCoreExpr f, ExpandEvalCoreExpr g) =>
-    ExpandEvalCoreExpr (f :+: g) where
-	expandEvalCoreExpr (Inl x) = expandEvalCoreExpr x
-	expandEvalCoreExpr (Inr x) = expandEvalCoreExpr x
+expandEval (Var _)   _ _ = Analysis.empty
+expandEval (Lam _ _) _ _ = Analysis.empty
+expandEval (App operator operand) env a
+    = Analysis.unions
+      [ Analysis.expand operator env a
+      , Analysis.expand operand  env a
+      , expandApply (Analysis.lookup operator env a)
+		    (Analysis.lookup operand  env a) a
+      ]
+expandEval (Pair e1 e2) env a
+    = (Analysis.expand e1 env a) `Analysis.union` (Analysis.expand e2 env a)
+expandEval (Letrec bindings body) env a
+    = expandEval (pushLetrec bindings body) env a
 
 amendAnalysis :: AbstractAnalysis -> AbstractAnalysis
 amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
@@ -346,10 +301,10 @@ amendAnalysis a = Analysis.unions . map amendBinding . Analysis.domain $ a
 	  = Analysis.insert e env (refineEval e env a) (expandEval e env a)
 
 -- NOTE: May not terminate
-analyze :: (CoreExpression, ScalarEnvironment) -> AbstractAnalysis
+analyze :: (CoreExpr, ScalarEnvironment) -> AbstractAnalysis
 analyze = last . analyze'
 
-analyze' :: (CoreExpression, ScalarEnvironment) -> [AbstractAnalysis]
+analyze' :: (CoreExpr, ScalarEnvironment) -> [AbstractAnalysis]
 analyze' (expression, constants)
     = iterateUntilStable amendAnalysis analysis0
     where
@@ -366,7 +321,7 @@ initialAbstractEnvironment :: ScalarEnvironment -> AbstractEnvironment
 initialAbstractEnvironment constants
     = Environment.map AbstractScalar $ primitives `Environment.union` constants
 
-read :: String -> (CoreExpression, ScalarEnvironment)
+read :: String -> (CoreExpr, ScalarEnvironment)
 read = first prepare . parse
 
 interpretMinimal :: String -> String

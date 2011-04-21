@@ -5,8 +5,11 @@ import VL.Common
 import VL.Scalar
 import VL.Syntax
 import VL.Coproduct
+import VL.Expression
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment (bindings)
+
+import VL.Iso
 
 import VL.ConcreteValue (ConcreteValue (..))
 import VL.AbstractValue (AbstractValue (..))
@@ -25,12 +28,12 @@ pprint = render . pp
 instance Pretty Name where
     pp = text
 
--- Pretty-printing of expressions
+-- Pretty-printing of syntaxes
 class Functor f => Display f where
     displayAlg :: f Doc -> Doc
 
-instance Display f => Pretty (Expr f) where
-    pp = foldExpr displayAlg
+instance Display f => Pretty (Syntax f) where
+    pp = foldSyntax displayAlg
 
 instance Display Variable where
     displayAlg (Variable x) = text x
@@ -121,6 +124,10 @@ instance (Display f, Display g) => Display (f :+: g) where
     displayAlg (Inl x) = displayAlg x
     displayAlg (Inr x) = displayAlg x
 
+-- Pretty-printing of expressions
+instance Pretty CoreExpr where
+    pp = pp . osi
+
 -- Pretty-printing of scalars
 instance Pretty Scalar where
     pp Nil             = parens empty
@@ -180,8 +187,8 @@ instance Pretty val => Pretty (Environment val) where
 	where
 	  ppBinding (x, v) = ppPair x v
 
-ppClosure :: Pretty val => Environment val -> Name -> CoreExpression -> Doc
-ppClosure env x b = internal "closure" $ pp env $+$ pp (mkLambdaOneArg x b)
+ppClosure :: Pretty val => Environment val -> Name -> CoreExpr -> Doc
+ppClosure env x b = internal "closure" $ pp env $+$ pp (Lam x b)
 
 ppPair :: (Pretty a, Pretty b) => a -> b -> Doc
 ppPair x y = parens $ sep [pp x, dot, pp y]

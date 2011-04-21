@@ -19,6 +19,8 @@ test: Test.hs
 		Prepare.hs \
 		Uniquify.hs \
 		FixedPoint.hs \
+		Iso.hs \
+		Expression.hs \
 	-threaded -o test && ./test
 
 clean:

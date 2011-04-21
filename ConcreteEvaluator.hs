@@ -2,8 +2,8 @@
 module VL.ConcreteEvaluator where
 
 import VL.Scalar
-import VL.Syntax
 import VL.Coproduct
+import VL.Expression
 import VL.FixedPoint
 
 import VL.Environment (Environment)
@@ -22,44 +22,19 @@ import Control.Monad (forever)
 import System.IO
 import Control.Exception
 
--- The following meta-circular evaluator is not fully modular.  A more
--- general class @EvalExpr@ would have a method @evalExpr@ of the type
--- @(EvalExpr g) => f (Expr g) -> Env g -> Value g@, where @Env g@ and
--- @Value g@ are environment and value types parametrized by the
--- signature @g@ of the expression type.
-class EvalCoreExpr f where
-    evalCoreExpr :: f CoreExpression
-		 -> ConcreteEnvironment
-		 -> ConcreteValue
-
-eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
-eval (In t) = evalCoreExpr t
-
-instance EvalCoreExpr Variable where
-    evalCoreExpr (Variable x) env = Environment.lookup x env
-
-instance EvalCoreExpr LambdaOneArg where
-    evalCoreExpr (LambdaOneArg arg body) env
-	= ConcreteClosure env' arg body
-	where
-	  fvs  = Set.delete arg (freeVariables body)
-	  env' = Environment.restrict fvs env
-
-instance EvalCoreExpr ApplicationOneArg where
-    evalCoreExpr (ApplicationOneArg operator operand) env
-	= apply (eval operator env) (eval operand env)
-
-instance EvalCoreExpr Cons where
-    evalCoreExpr (Cons e1 e2) env
-	= ConcretePair (eval e1 env) (eval e2 env)
-
-instance EvalCoreExpr LetrecOneArg where
-    evalCoreExpr (LetrecOneArg bindings body) env
-	= eval (pushLetrec bindings body) env
-
-instance (EvalCoreExpr f, EvalCoreExpr g) => EvalCoreExpr (f :+: g) where
-    evalCoreExpr (Inl x) = evalCoreExpr x
-    evalCoreExpr (Inr x) = evalCoreExpr x
+eval :: CoreExpr -> ConcreteEnvironment -> ConcreteValue
+eval (Var x) env
+    = Environment.lookup x env
+eval e@(Lam formal body) env
+    = ConcreteClosure env' formal body
+    where
+      env' = Environment.restrict (freeVariables e) env
+eval (App operator operand) env
+    = apply (eval operator env) (eval operand env)
+eval (Pair car cdr) env
+    = ConcretePair (eval car env) (eval cdr env)
+eval (Letrec bindings body) env
+    = eval (pushLetrec bindings body) env
 
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)

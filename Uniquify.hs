@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 module VL.Uniquify
     ( Supply
     , evalSupply
@@ -21,11 +21,11 @@ import Control.Monad.State
 -- Variable renaming
 type Dictionary = Map Name Name
 
-rename :: Dictionary -> CoreExpression -> CoreExpression
-rename dict = foldExpr (renameAlg dict)
+rename :: Dictionary -> CoreSyntax -> CoreSyntax
+rename dict = foldSyntax (renameAlg dict)
 
 class Functor f => Rename f where
-    renameAlg :: Dictionary -> f CoreExpression -> CoreExpression
+    renameAlg :: Dictionary -> f CoreSyntax -> CoreSyntax
 
 maybeRename :: Dictionary -> Name -> Name
 maybeRename dict name = fromMaybe name (Map.lookup name dict)
@@ -77,11 +77,11 @@ freshName prefix = do i <- get
 freshVarName :: Supply Name
 freshVarName = freshName "#:var-"
 
-uniquify :: CoreExpression -> CoreExpression
-uniquify = evalSupply . foldExpr uniquifyAlg
+uniquify :: CoreSyntax -> CoreSyntax
+uniquify = evalSupply . foldSyntax uniquifyAlg
 
 class Functor f => Uniquify f where
-    uniquifyAlg :: f (Supply CoreExpression) -> Supply CoreExpression
+    uniquifyAlg :: f (Supply CoreSyntax) -> Supply CoreSyntax
 
 instance Uniquify Variable where
     uniquifyAlg (Variable x) = return (mkVariable x)
@@ -91,7 +91,7 @@ instance Uniquify LambdaOneArg where
 	= do (arg', body') <- uniquifyLambda arg body
 	     return $ mkLambdaOneArg arg' body'
 
-uniquifyLambda :: Name -> Supply CoreExpression -> Supply (Name, CoreExpression)
+uniquifyLambda :: Name -> Supply CoreSyntax -> Supply (Name, CoreSyntax)
 uniquifyLambda arg body
     = do x <- freshVarName
 	 b <- body
