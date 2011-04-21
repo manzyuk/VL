@@ -276,29 +276,40 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls
       values   = Analysis.values analysis
       nonVoids = filter isNonVoid values
 
+      -- Build lookup tables and lookup functions for relevant data
       xTbl = Map.fromList [(n, zencode n) | n <- Set.toList (variables expression)]
-      xFun = mkLookupFun xTbl
+      xFun = mkLookupFun xTbl   -- X from the paper
       sTbl = mkLookupTbl "#:val-" values
-      sFun = mkLookupFun sTbl
+      sFun = mkLookupFun sTbl   -- S from the paper
       fTbl = mkLookupTbl "#:fun-" [ (v1, v2) | v1 <- values, v2 <- values ]
-      fFun = mkLookupFun fTbl
+      fFun = mkLookupFun fTbl   -- F from the paper
       tTbl = Map.fromList [(v, genCType sFun xFun v) | v <- nonVoids ]
-      tFun = mkLookupFun tTbl
+      tFun = mkLookupFun tTbl   -- T from the paper
       mTbl = mkLookupTbl "#:con-" nonVoids
-      mFun = mkLookupFun mTbl
+      mFun = mkLookupFun mTbl   -- M from the paper
 
-      nonVoidClosures = [ (env, x, e, v)
-			| c@(AbstractClosure env x e) <- values
-			, let vs = [ v'
-				   | v <- values
-				   , let v' = refineApply c v analysis
-				   , v' /= AbstractBottom
-				   ]
-			, all isNonVoid vs
-			, v <- vs
-			]
+      -- Find pairs (abstract closure, abstract value) for which C
+      -- functions must be generated.  Not sure what the relevant
+      -- passage from the paper really means.  An alternative is
+      -- commented out below.
+      nonVoidApplications = [ (env, x, e, v)
+			    | c@(AbstractClosure env x e) <- values
+			    , let vs = [ v'
+				       | v <- values
+				       , let v' = refineApply c v analysis
+				       , v' /= AbstractBottom
+				       ]
+			    , all isNonVoid vs
+			    , v <- vs
+			    ]
+      -- nonVoidApplications = [ (env, x, e, v)
+      --   		    | c@(AbstractClosure env x e) <- values
+      --   		    , v <- values
+      --   		    , let v' = refineApply c v analysis
+      --   		    , v' /= AbstractBottom && isNonVoid v'
+      --   		    ]
 
-      structDecls = concatMap (genCStructDecl tFun mFun) nonVoids
+      structDecls   = concatMap (genCStructDecl tFun mFun) nonVoids
       functionDecls = [ genFunctionDecl xFun tFun mFun fFun analysis v env x e
-		      | (env, x, e, v) <- nonVoidClosures
+		      | (env, x, e, v) <- nonVoidApplications
 		      ]
