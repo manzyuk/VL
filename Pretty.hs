@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, TypeOperators #-}
-module VL.Pretty (pprint) where
+module VL.Pretty (Pretty, pp, pprint) where
 
 import VL.Common
 import VL.Scalar
