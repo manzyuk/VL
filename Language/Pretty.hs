@@ -25,6 +25,7 @@ pprint = render . pp
 instance Pretty Name where
     pp = text
 
+-- General purpose combinators
 sepMap :: (a -> Doc) -> [a] -> Doc
 sepMap f = sep . map f
 
