@@ -4,6 +4,7 @@ module VL.Language.Pretty
     , pp
     , pprint
     , sepMap
+    , ppList
     , ppPair
     , internal
     , dot, newline
@@ -27,8 +28,11 @@ instance Pretty Name where
 sepMap :: (a -> Doc) -> [a] -> Doc
 sepMap f = sep . map f
 
+ppList :: [Doc] -> Doc
+ppList = parens . sep
+
 ppPair :: (Pretty a, Pretty b) => a -> b -> Doc
-ppPair x y = parens $ sep [pp x, dot, pp y]
+ppPair x y = ppList [pp x, dot, pp y]
 
 internal :: String -> Doc -> Doc
 internal name contents = text "#[" <> sep [text name, contents] <> char ']'

@@ -127,71 +127,71 @@ instance Display LambdaManyArgs where
 
 instance Display ApplicationOneArg where
     displayAlg (ApplicationOneArg operator operand)
-	= parens $ sep [operator, operand]
+	= ppList [operator, operand]
 
 instance Display ApplicationManyArgs where
     displayAlg (ApplicationManyArgs operator operands)
-	= parens $ sep (operator : operands)
+	= ppList (operator : operands)
 
 instance Display Cons where
     displayAlg (Cons x1 x2)
-	= parens $ sep [text "cons", x1, x2]
+	= ppList [text "cons", x1, x2]
 
 instance Display List where
     displayAlg (List xs)
-	= parens $ sep (text "list" : xs)
+	= ppList (text "list" : xs)
 
 instance Display ConsStar where
     displayAlg (ConsStar xs)
-	= parens $ sep (text "cons*" : xs)
+	= ppList (text "cons*" : xs)
 
 instance Display If where
     displayAlg (If predicate consequent alternate)
-	= parens $ sep [text "if", predicate, consequent, alternate]
+	= ppList [text "if", predicate, consequent, alternate]
 
 instance Display Or where
     displayAlg (Or xs)
-	= parens $ sep (text "or" : xs)
+	= ppList (text "or" : xs)
 
 instance Display And where
     displayAlg (And xs)
-	= parens $ sep (text "and" : xs)
+	= ppList (text "and" : xs)
 
 instance Display Not where
     displayAlg (Not x)
-	= parens $ sep [text "not", x]
+	= ppList [text "not", x]
 
 instance Display Cond where
     displayAlg (Cond clauses)
-	= parens $ sep (text "cond" : map ppClause clauses)
+	= ppList (text "cond" : map ppClause clauses)
 	where
-	  ppClause (test, expression) = parens $ sep [test, expression]
+	  ppClause (test, expression) = ppList [test, expression]
 
 instance Display Let where
     displayAlg (Let bindings body)
-	= parens $ sep [ text "let"
-		       , parens . sepMap ppBinding $ bindings
-		       , body
-		       ]
+	= ppList [ text "let"
+		 , parens . sepMap ppBinding $ bindings
+		 , body
+		 ]
 	where
 	  ppBinding (name, expression)
-	      = parens $ sep [text name, expression]
+	      = ppList [text name, expression]
 
 instance Display LetrecOneArg where
     displayAlg (LetrecOneArg bindings body)
-	= parens $ sep [ text "letrec"
-		       , parens . sepMap ppBinding $ bindings
-		       , body
-		       ]
+	= ppList [ text "letrec"
+		 , parens . sepMap ppBinding $ bindings
+		 , body
+		 ]
 	where
 	  ppBinding (name, arg, body)
 	      = parens $ hang (text name <+> parens (text arg)) 1 body
 
 instance Display LetrecManyArgs where
     displayAlg (LetrecManyArgs bindings body)
-	= parens $ sep [ text "letrec"
-		       , parens . sepMap ppBinding $ bindings
-		       , body]
+	= ppList [ text "letrec"
+		 , parens . sepMap ppBinding $ bindings
+		 , body]
 	where
 	  ppBinding (name, args, body)
 	      = parens $ hang (text name <+> parens (sepMap text args)) 1 body

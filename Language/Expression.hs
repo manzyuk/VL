@@ -24,14 +24,14 @@ instance Pretty CoreExpr where
     pp (Lam formal body)
 	= parens $ hang (text "lambda" <+> parens (text formal)) 1 (pp body)
     pp (App operator operand)
-	= parens $ sep [pp operator, pp operand]
+	= ppList [pp operator, pp operand]
     pp (Pair car cdr)
-	= parens $ sep [text "cons", pp car, pp cdr]
+	= ppList [text "cons", pp car, pp cdr]
     pp (Letrec bindings body)
-	= parens $ sep [ text "letrec"
-		       , parens . sepMap ppBinding $ bindings
-		       , pp body
-		       ]
+	= ppList [ text "letrec"
+		 , parens . sepMap ppBinding $ bindings
+		 , pp body
+		 ]
 	where
 	  ppBinding (name, formal, body)
 	      = parens $ hang (text name <+> parens (text formal)) 1 (pp body)

@@ -70,6 +70,6 @@ map f = Environment . List.map (second f) . bindings
 
 -- Pretty-printing of environments
 instance Pretty val => Pretty (Environment val) where
-    pp = parens . sep . List.map ppBinding . bindings
+    pp = ppList . List.map ppBinding . bindings
 	where
 	  ppBinding (x, v) = ppPair x v
