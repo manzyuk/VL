@@ -9,6 +9,6 @@ data ConcreteValue
     = ConcreteScalar Scalar
     | ConcreteClosure ConcreteEnvironment Name CoreExpr
     | ConcretePair ConcreteValue ConcreteValue
-      deriving (Eq, Ord)
+      deriving (Eq, Ord, Show)
 
 type ConcreteEnvironment = Environment ConcreteValue
