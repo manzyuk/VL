@@ -57,10 +57,10 @@ domain :: AbstractAnalysis -> [(CoreExpression, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
-values a = concat [ v : Environment.values env
-		  | ((e, env), v) <- Map.toList (bindings a)
-		  ]
--- values = Map.elems . bindings
+-- values a = concat [ v : Environment.values env
+-- 		  | ((e, env), v) <- Map.toList (bindings a)
+-- 		  ]
+values = Map.elems . bindings
 
 expand :: CoreExpression
        -> AbstractEnvironment
