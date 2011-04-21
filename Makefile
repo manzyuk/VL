@@ -9,7 +9,7 @@ test: Test.hs
 		Pretty.hs \
 		Parser.hs \
 		AbstractValue.hs \
-		Expression.hs \
+		Syntax.hs \
 		Common.hs \
 		ConcreteValue.hs \
 		Token.hs \

@@ -2,7 +2,7 @@ module VL.ConcreteValue where
 
 import VL.Common
 import VL.Scalar
-import VL.Expression
+import VL.Syntax
 import VL.Environment
 
 data ConcreteValue

@@ -1,6 +1,6 @@
 module VL.Prepare (prepare) where
 
-import VL.Expression
+import VL.Syntax
 
 import VL.Desugar (desugar)
 import VL.Uniquify (uniquify)

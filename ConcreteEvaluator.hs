@@ -2,9 +2,9 @@
 module VL.ConcreteEvaluator where
 
 import VL.Scalar
+import VL.Syntax
 import VL.Coproduct
 import VL.FixedPoint
-import VL.Expression
 
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment
@@ -29,8 +29,8 @@ import Control.Exception
 -- signature @g@ of the expression type.
 class EvalCoreExpr f where
     evalCoreExpr :: f CoreExpression
-                 -> ConcreteEnvironment
-                 -> ConcreteValue
+		 -> ConcreteEnvironment
+		 -> ConcreteValue
 
 eval :: CoreExpression -> ConcreteEnvironment -> ConcreteValue
 eval (In t) = evalCoreExpr t
@@ -40,22 +40,22 @@ instance EvalCoreExpr Variable where
 
 instance EvalCoreExpr LambdaOneArg where
     evalCoreExpr (LambdaOneArg arg body) env
-        = ConcreteClosure env' arg body
-        where
-          fvs  = Set.delete arg (freeVariables body)
-          env' = Environment.restrict fvs env
+	= ConcreteClosure env' arg body
+	where
+	  fvs  = Set.delete arg (freeVariables body)
+	  env' = Environment.restrict fvs env
 
 instance EvalCoreExpr ApplicationOneArg where
     evalCoreExpr (ApplicationOneArg operator operand) env
-        = apply (eval operator env) (eval operand env)
+	= apply (eval operator env) (eval operand env)
 
 instance EvalCoreExpr Cons where
     evalCoreExpr (Cons e1 e2) env
-        = ConcretePair (eval e1 env) (eval e2 env)
+	= ConcretePair (eval e1 env) (eval e2 env)
 
 instance EvalCoreExpr LetrecOneArg where
     evalCoreExpr (LetrecOneArg bindings body) env
-        = eval (pushLetrec bindings body) env
+	= eval (pushLetrec bindings body) env
 
 instance (EvalCoreExpr f, EvalCoreExpr g) => EvalCoreExpr (f :+: g) where
     evalCoreExpr (Inl x) = evalCoreExpr x
@@ -120,19 +120,19 @@ unary _ _ = error "unary: can't perform arithmetic on non-numbers"
 
 arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
 arithmetic op (ConcretePair (ConcreteScalar (Real r1))
-                            (ConcreteScalar (Real r2)))
+			    (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
 arithmetic _ _ = error "arithmetic: can't perform arithmetic on non-numbers"
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
-                            (ConcreteScalar (Real r2)))
+			    (ConcreteScalar (Real r2)))
     = ConcreteScalar (Boolean (r1 `op` r2))
 comparison _ _ = error "comparison: can't compare non-numbers"
 
 primIfProc :: ConcreteValue -> ConcreteValue
 primIfProc (ConcretePair (ConcreteScalar (Boolean c))
-                         (ConcretePair t e))
+			 (ConcretePair t e))
     | c
     = force t
     | otherwise
@@ -163,7 +163,7 @@ interpret input = pprint $ eval (prepare expression) environment
     where
       (expression, constants) = parse input
       environment = Environment.map ConcreteScalar
-                  $ primitives `Environment.union` constants
+		  $ primitives `Environment.union` constants
 
 interpreter :: IO ()
 interpreter = do
@@ -172,8 +172,8 @@ interpreter = do
   forever . handle (\e -> print (e :: ErrorCall)) $ repl
     where
       repl = do
-        putStr prompt
-        input <- getLine
-        putStrLn $ interpret input
+	putStr prompt
+	input <- getLine
+	putStrLn $ interpret input
 
       prompt = "vl> "

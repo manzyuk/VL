@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances            #-}
 {-# LANGUAGE StandaloneDeriving, DeriveFunctor              #-}
 {-# LANGUAGE TemplateHaskell                                #-}
-module VL.Expression where
+module VL.Syntax where
 
 import VL.Common
 import VL.Coproduct

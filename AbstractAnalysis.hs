@@ -16,7 +16,7 @@ module VL.AbstractAnalysis
     where
 
 import VL.Common
-import VL.Expression
+import VL.Syntax
 import VL.AbstractValue
 
 import qualified VL.Environment as Environment

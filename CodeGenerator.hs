@@ -3,8 +3,8 @@ module VL.CodeGenerator where
 
 import VL.Common
 import VL.Scalar
+import VL.Syntax
 import VL.Coproduct
-import VL.Expression
 import VL.FixedPoint
 
 import VL.Environment (Environment)

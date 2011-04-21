@@ -3,8 +3,8 @@ module VL.Pretty (Pretty, pp, pprint) where
 
 import VL.Common
 import VL.Scalar
+import VL.Syntax
 import VL.Coproduct
-import VL.Expression
 import VL.Environment (Environment)
 import qualified VL.Environment as Environment (bindings)
 

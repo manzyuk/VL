@@ -3,20 +3,20 @@
 module VL.Desugar (desugar) where
 
 import VL.Common
+import VL.Syntax
 import VL.Coproduct
-import VL.Expression
 import VL.FixedPoint
 
 -- Elimination of derived conditionals (OR, AND, COND)
 type Stage1  =  Variable
-            :+: LambdaManyArgs
-            :+: ApplicationManyArgs
-            :+: Cons
-            :+: List
-            :+: ConsStar
-            :+: If
-            :+: Let
-            :+: LetrecManyArgs
+	    :+: LambdaManyArgs
+	    :+: ApplicationManyArgs
+	    :+: Cons
+	    :+: List
+	    :+: ConsStar
+	    :+: If
+	    :+: Let
+	    :+: LetrecManyArgs
 
 elimConditionals :: Expr Surface -> Expr Stage1
 elimConditionals = foldExpr elimConditionalsAlg
@@ -38,36 +38,36 @@ $(deriveAlgebraInstances ''ElimConditionals
 
 instance ElimConditionals Or where
     elimConditionalsAlg (Or xs) = foldr wrap (mkVariable false) xs
-        where
-          wrap x y = mkIf x (mkVariable true) y
+	where
+	  wrap x y = mkIf x (mkVariable true) y
 
 instance ElimConditionals And where
     elimConditionalsAlg (And xs) = foldr wrap (mkVariable true) xs
-        where
-          wrap x y = mkIf x y (mkVariable false)
+	where
+	  wrap x y = mkIf x y (mkVariable false)
 
 instance ElimConditionals Not where
     elimConditionalsAlg (Not x) = mkIf x (mkVariable false) (mkVariable true)
 
 instance ElimConditionals Cond where
     elimConditionalsAlg (Cond clauses) = foldr wrap (mkVariable nil) clauses
-        where
-          wrap (t, e) e' = mkIf t e e'
+	where
+	  wrap (t, e) e' = mkIf t e e'
 
 instance (ElimConditionals f, ElimConditionals g) =>
     ElimConditionals (f :+: g) where
-        elimConditionalsAlg (Inl x) = elimConditionalsAlg x
-        elimConditionalsAlg (Inr x) = elimConditionalsAlg x
+	elimConditionalsAlg (Inl x) = elimConditionalsAlg x
+	elimConditionalsAlg (Inr x) = elimConditionalsAlg x
 
 -- Elimination of IF
 type Stage2  =  Variable
-            :+: LambdaManyArgs
-            :+: ApplicationManyArgs
-            :+: Cons
-            :+: List
-            :+: ConsStar
-            :+: Let
-            :+: LetrecManyArgs
+	    :+: LambdaManyArgs
+	    :+: ApplicationManyArgs
+	    :+: Cons
+	    :+: List
+	    :+: ConsStar
+	    :+: Let
+	    :+: LetrecManyArgs
 
 elimIf :: Expr Stage1 -> Expr Stage2
 elimIf = foldExpr elimIfAlg
@@ -88,10 +88,10 @@ $(deriveAlgebraInstances ''ElimIf
 
 instance ElimIf If where
     elimIfAlg (If predicate consequent alternate)
-        = mkApplicationManyArgs (mkVariable "#:if-procedure")
-                   [predicate, thunk consequent, thunk alternate]
-        where
-          thunk e = mkLambdaManyArgs [] e
+	= mkApplicationManyArgs (mkVariable "#:if-procedure")
+		   [predicate, thunk consequent, thunk alternate]
+	where
+	  thunk e = mkLambdaManyArgs [] e
 
 instance (ElimIf f, ElimIf g) => ElimIf (f :+: g) where
     elimIfAlg (Inl x) = elimIfAlg x
@@ -99,12 +99,12 @@ instance (ElimIf f, ElimIf g) => ElimIf (f :+: g) where
 
 -- Elimination of LET
 type Stage3  =  Variable
-            :+: LambdaManyArgs
-            :+: ApplicationManyArgs
-            :+: Cons
-            :+: List
-            :+: ConsStar
-            :+: LetrecManyArgs
+	    :+: LambdaManyArgs
+	    :+: ApplicationManyArgs
+	    :+: Cons
+	    :+: List
+	    :+: ConsStar
+	    :+: LetrecManyArgs
 
 elimLet :: Expr Stage2 -> Expr Stage3
 elimLet = foldExpr elimLetAlg
@@ -124,9 +124,9 @@ $(deriveAlgebraInstances ''ElimLet
 
 instance ElimLet Let where
     elimLetAlg (Let bindings body)
-        = mkApplicationManyArgs (mkLambdaManyArgs args body) vals
-        where
-          (args, vals) = unzip bindings
+	= mkApplicationManyArgs (mkLambdaManyArgs args body) vals
+	where
+	  (args, vals) = unzip bindings
 
 instance (ElimLet f, ElimLet g) => ElimLet (f :+: g) where
     elimLetAlg (Inl x) = elimLetAlg x
@@ -134,12 +134,12 @@ instance (ElimLet f, ElimLet g) => ElimLet (f :+: g) where
 
 -- Elimination of many arguments (in lambdas, applications, and LETREC bindings)
 type Stage4  =  Variable
-            :+: LambdaOneArg
-            :+: ApplicationOneArg
-            :+: Cons
-            :+: List
-            :+: ConsStar
-            :+: LetrecOneArg
+	    :+: LambdaOneArg
+	    :+: ApplicationOneArg
+	    :+: Cons
+	    :+: List
+	    :+: ConsStar
+	    :+: LetrecOneArg
 
 elimManyArgs :: Expr Stage3 -> Expr Stage4
 elimManyArgs = foldExpr elimManyArgsAlg
@@ -156,9 +156,9 @@ $(deriveAlgebraInstances ''ElimManyArgs
 
 instance ElimManyArgs LambdaManyArgs where
     elimManyArgsAlg (LambdaManyArgs args body)
-        = mkLambdaOneArg arg body'
-        where
-          (arg, body') = nestLambdas args body
+	= mkLambdaOneArg arg body'
+	where
+	  (arg, body') = nestLambdas args body
 
 -- Transform a lambda that takes possibly many arguments into a
 -- combination of nested lambdas that take only one argument,
@@ -190,7 +190,7 @@ nestLambdas args  body = ("#:args", body'')
       with x v e    = mkApplicationOneArg (mkLambdaOneArg x e) v
 
 cdnr, cadnr :: (ApplicationOneArg :<: f, Variable :<: f)
-            => Int -> Expr f -> Expr f
+	    => Int -> Expr f -> Expr f
 cdnr n = compose (replicate n cdr)
     where
       compose = foldr (.) id
@@ -202,16 +202,16 @@ cadnr n = car . cdnr n
 
 instance ElimManyArgs ApplicationManyArgs where
     elimManyArgsAlg (ApplicationManyArgs operator operands)
-        = mkApplicationOneArg operator (mkConsStar operands)
+	= mkApplicationOneArg operator (mkConsStar operands)
 
 instance ElimManyArgs LetrecManyArgs where
     elimManyArgsAlg (LetrecManyArgs bindings body)
-        = mkLetrecOneArg bindings' body
-        where
-          bindings' = [ (name, arg, e')
-                      | (name, args, e) <- bindings
-                      , let (arg, e') = nestLambdas args e
-                      ]
+	= mkLetrecOneArg bindings' body
+	where
+	  bindings' = [ (name, arg, e')
+		      | (name, args, e) <- bindings
+		      , let (arg, e') = nestLambdas args e
+		      ]
 
 instance (ElimManyArgs f, ElimManyArgs g) => ElimManyArgs (f :+: g) where
     elimManyArgsAlg (Inl x) = elimManyArgsAlg x
@@ -249,7 +249,7 @@ instance (ElimList f, ElimList g) => ElimList (f :+: g) where
 
 desugar :: SurfaceExpression -> CoreExpression
 desugar = elimList
-        . elimManyArgs
-        . elimLet
-        . elimIf
-        . elimConditionals
+	. elimManyArgs
+	. elimLet
+	. elimIf
+	. elimConditionals
