@@ -24,7 +24,7 @@ import qualified Data.List as List
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Control.Arrow (second)
+import Control.Arrow
 
 newtype Environment val
     = Environment { bindings :: [(Name, val)] } deriving (Eq, Ord, Show)

@@ -12,9 +12,6 @@ import VL.Language.Pretty
 import VL.Alacarte.Coproduct
 import VL.Alacarte.FixedPoint
 
-import Data.Set (Set, (\\))
-import qualified Data.Set as Set
-
 type Syntax = Fix
 
 data Variable            a = Variable Name

@@ -18,7 +18,7 @@ import VL.Concrete.Value
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Control.Monad (forever)
+import Control.Monad
 import System.IO
 import Control.Exception
 

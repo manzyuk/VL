@@ -1,11 +1,11 @@
 module VL.Language.Common
-    ( fromMaybe
-    , Name
+    ( Name
     , nil, true, false
+    , module Data.Maybe
     )
     where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe
 
 type Name = String
 

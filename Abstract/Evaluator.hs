@@ -18,14 +18,12 @@ import qualified VL.Abstract.Analysis as Analysis
 
 import Prelude hiding (read)
 
-import Data.Maybe (isJust)
-
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Control.Arrow (first)
+import Control.Arrow
 
-import Control.Monad (forever)
+import Control.Monad
 import System.IO
 import Control.Exception
 
