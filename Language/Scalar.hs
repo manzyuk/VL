@@ -88,7 +88,7 @@ primitives = Environment.fromList . map (second Primitive) $
 
 -- Pretty-printing of scalars
 instance Pretty Scalar where
-    pp Nil             = lparen <> rparen
+    pp Nil             = parens empty
     pp (Boolean True)  = text "#t"
     pp (Boolean False) = text "#f"
     pp (Real r)        = float r

@@ -8,7 +8,7 @@ import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment
 
 import VL.Language.Parser
-import VL.Language.Pretty
+import VL.Language.Pretty hiding (float)
 import VL.Language.Prepare
 
 import VL.Abstract.Value
@@ -115,13 +115,13 @@ data Abstraction a
       , abstract :: AbstractValue
       }
 
-real :: Abstraction Float
-real = Abstraction {
-	 name     = "Real"
-       , convert  = AbstractScalar . Real
-       , extract  = maybeReal
-       , abstract = AbstractReal
-       }
+float :: Abstraction Float
+float = Abstraction {
+	  name     = "Real"
+	, convert  = AbstractScalar . Real
+	, extract  = maybeReal
+	, abstract = AbstractReal
+	}
     where
       maybeReal (AbstractScalar (Real r)) = Just r
       maybeReal _                         = Nothing
@@ -162,10 +162,10 @@ liftOp a b c op x y
 	Just v = extract b y
 
 arithmetic :: (Float -> Float -> Float) -> AbstractValue -> AbstractValue
-arithmetic op = dyadic $ liftOp real real real op
+arithmetic op = dyadic $ liftOp float float float op
 
 comparison :: (Float -> Float -> Bool) -> AbstractValue -> AbstractValue
-comparison op = dyadic $ liftOp real real bool op
+comparison op = dyadic $ liftOp float float bool op
 
 unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))

@@ -16,7 +16,7 @@ module VL.Abstract.Analysis
     where
 
 import VL.Language.Common
-import VL.Language.Pretty
+import VL.Language.Pretty hiding (empty)
 import VL.Language.Expression
 import qualified VL.Language.Environment as Environment
 

@@ -16,7 +16,7 @@ module VL.Language.Environment
     where
 
 import VL.Language.Common
-import VL.Language.Pretty
+import VL.Language.Pretty hiding (empty)
 
 import Prelude hiding (map, lookup)
 import qualified Data.List as List

@@ -13,7 +13,7 @@ module VL.Language.Pretty
 
 import VL.Language.Common
 
-import Text.PrettyPrint hiding (empty)
+import Text.PrettyPrint
 
 class Pretty a where
     pp :: a -> Doc
