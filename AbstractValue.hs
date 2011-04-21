@@ -13,7 +13,7 @@ data AbstractValue
     | AbstractClosure AbstractEnvironment Name CoreExpr
     | AbstractPair AbstractValue AbstractValue
     | AbstractBottom
-      deriving (Eq, Ord)
+      deriving (Eq, Ord, Show)
 
 type AbstractEnvironment = Environment AbstractValue
 
@@ -56,8 +56,13 @@ joinValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
 	  = (x, (Environment.lookup x env1) `joinValues` (Environment.lookup x env2))
 joinValues (AbstractPair v1 v2) (AbstractPair v1' v2')
     = AbstractPair (v1 `joinValues` v1') (v2 `joinValues` v2')
-joinValues _ _
-    = error "joinValues: join doesn't exist"
+joinValues v1 v2
+    = error $ unlines [ "joinValues: join of"
+		      , show v1
+		      , "and"
+		      , show v2
+		      , "doesn't exist"
+		      ]
 
 isSomeBoolean, isSomeReal :: AbstractValue -> Bool
 
