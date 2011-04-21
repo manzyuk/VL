@@ -57,7 +57,7 @@ joinValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
 joinValues (AbstractPair v1 v2) (AbstractPair v1' v2')
     = AbstractPair (v1 `joinValues` v1') (v2 `joinValues` v2')
 joinValues v1 v2
-    = error $ unlines [ "joinValues: join of"
+    = error $ unwords [ "joinValues: join of"
 		      , show v1
 		      , "and"
 		      , show v2
