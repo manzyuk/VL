@@ -39,7 +39,7 @@ eval (Letrec bindings body) env
 apply :: ConcreteValue -> ConcreteValue -> ConcreteValue
 apply (ConcreteClosure env x e) v = eval e (Environment.insert x v env)
 apply (ConcreteScalar (Primitive p)) v = dispatch p v
-apply _ _ = error "apply: can't apply a concrete non-function"
+apply v _ = error $ "apply: can't apply " ++ show v
 
 dispatch :: Primitive -> ConcreteValue -> ConcreteValue
 dispatch Car   = primCar
@@ -83,27 +83,29 @@ dispatch RealPrim  = primReal
 
 primCar :: ConcreteValue -> ConcreteValue
 primCar (ConcretePair v1 _) = v1
-primCar _ = error "primCar: can't apply car to a non-pair"
+primCar v = error $ "primCar: the argument is not a pair: " ++ show v
 
 primCdr :: ConcreteValue -> ConcreteValue
 primCdr (ConcretePair _ v2) = v2
-primCdr _ = error "primCdr: can't apply cdr to a non-pair"
+primCdr v = error $ "primCdr: the argument is not a pair: " ++ show v
 
 unary :: (Float -> Float) -> ConcreteValue -> ConcreteValue
 unary f (ConcreteScalar (Real r)) = ConcreteScalar (Real (f r))
-unary _ _ = error "unary: can't perform arithmetic on non-numbers"
+unary _ v = error $ "unary: the argument is not a real: " ++ show v
 
 arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
 arithmetic op (ConcretePair (ConcreteScalar (Real r1))
 			    (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
-arithmetic _ _ = error "arithmetic: can't perform arithmetic on non-numbers"
+arithmetic _ v
+    = error $ "arithmetic: the argument is not a pair of reals: " ++ show v
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
 			    (ConcreteScalar (Real r2)))
     = ConcreteScalar (Boolean (r1 `op` r2))
-comparison _ _ = error "comparison: can't compare non-numbers"
+comparison _ v
+    = error $ "comparison: the argument is not a pair of reals: " ++ show v
 
 primIfProc :: ConcreteValue -> ConcreteValue
 primIfProc (ConcretePair (ConcreteScalar (Boolean c))
@@ -114,7 +116,7 @@ primIfProc (ConcretePair (ConcreteScalar (Boolean c))
     = force e
     where
       force thunk = apply thunk (ConcreteScalar Nil)
-primIfProc v = error $ unlines ["Malformed IF expression:", pprint v]
+primIfProc v = error $ "primIfProc: malformed IF expression: " ++ show v
 
 predicate :: (ConcreteValue -> Bool) -> ConcreteValue -> ConcreteValue
 predicate p = ConcreteScalar . Boolean . p
@@ -131,7 +133,7 @@ isBoolean _                            = False
 
 primReal :: ConcreteValue -> ConcreteValue
 primReal v@(ConcreteScalar (Real _)) = v
-primReal _ = error "primReal: the argument is not a real"
+primReal v = error $ "primReal: the argument is not a real: " ++ show v
 
 interpret :: String -> String
 interpret input = pprint $ eval (prepare expression) environment

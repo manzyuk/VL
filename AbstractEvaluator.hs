@@ -44,7 +44,7 @@ refineApply (AbstractClosure env x e) v a
 refineApply (AbstractScalar (Primitive p)) v a
     = refinePrimitive p a v
 refineApply AbstractBottom _ _ = AbstractBottom
-refineApply _ _ _ = error "refineApply: can't refine an abstract non-function"
+refineApply v _ _ = error $ "refineApply: can't refine " ++ show v
 
 refinePrimitive :: Primitive
 		-> AbstractAnalysis
@@ -92,24 +92,26 @@ refinePrimitive RealPrim _  = primReal
 primCar :: AbstractValue -> AbstractValue
 primCar (AbstractPair v1 _) = v1
 primCar AbstractBottom = AbstractBottom
-primCar _ = error "primCar: provably a non-pair where a pair is expected"
+primCar v = error $ "primCar: the argument is not a pair: " ++ show v
 
 primCdr :: AbstractValue -> AbstractValue
 primCdr (AbstractPair _ v2) = v2
 primCdr AbstractBottom = AbstractBottom
-primCdr _ = error "primCdr: provably a non-pair where a pair is expected"
+primCdr v = error $ "primCdr: the argument is not a pair: " ++ show v
 
 dyadic :: (AbstractValue -> AbstractValue -> AbstractValue)
        -> AbstractValue
        -> AbstractValue
 dyadic op (AbstractPair v1 v2) = v1 `op` v2
 dyadic op AbstractBottom = AbstractBottom
-dyadic op _ = error "dyadic: provably a non-pair where a pair is expected"
+dyadic op v = error $ "dyadic: the argument is not a pair: " ++ show v
 
 data Abstraction a
     = Abstraction {
+      -- a string representation of the type a, for debugging
+	name :: String
       -- view a concrete value of type a as an abstract value
-	convert  :: a -> AbstractValue
+      , convert  :: a -> AbstractValue
       -- try to extract a value of type a from an abstract value
       , extract  :: AbstractValue -> Maybe a
       -- abstract value corresponding to concrete values of type a
@@ -118,7 +120,8 @@ data Abstraction a
 
 float :: Abstraction Float
 float = Abstraction {
-	  convert  = AbstractScalar . Real
+	  name     = "Float"
+	, convert  = AbstractScalar . Real
 	, extract  = maybeReal
 	, abstract = AbstractReal
 	}
@@ -128,7 +131,8 @@ float = Abstraction {
 
 bool :: Abstraction Bool
 bool = Abstraction {
-	 convert  = AbstractScalar . Boolean
+	 name     = "Bool"
+       , convert  = AbstractScalar . Boolean
        , extract  = maybeBoolean
        , abstract = AbstractBoolean
        }
@@ -147,7 +151,11 @@ liftOp :: Abstraction a -> Abstraction b -> Abstraction c
        -> (AbstractValue -> AbstractValue -> AbstractValue)
 liftOp a b c op x y
     | isNotSomeOfType a x || isNotSomeOfType b y
-    = error "liftOp: type error"
+    = error $ unwords [ "liftOp: arguments"
+		      , show x, "and", show y
+		      , "do not match the expected types"
+		      , name a, "and", name b
+		      ]
     | x == abstract a || y == abstract b
     = abstract c
     | otherwise
@@ -166,7 +174,7 @@ unary :: (Float -> Float) -> AbstractValue -> AbstractValue
 unary f (AbstractScalar (Real r)) = AbstractScalar (Real (f r))
 unary _ AbstractReal = AbstractReal
 unary _ AbstractBottom  = AbstractBottom
-unary _ _ = error "unary: provably a non-real where some real is expected"
+unary _ v = error $ "unary: the argument is not a real: " ++ show v
 
 refineIfProc :: AbstractAnalysis -> AbstractValue -> AbstractValue
 refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
@@ -180,14 +188,15 @@ refineIfProc a (AbstractPair AbstractBoolean
     = (refineThunk t a) `joinValues` (refineThunk e a)
 refineIfProc a AbstractBottom
     = AbstractBottom
-refineIfProc a _
-    = error "refineIfProc: provably a non-boolean where some boolean is expected"
+refineIfProc a v
+    = error $ "refineIfProc: the argument is not a boolean: " ++ show v
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
 refineThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = refineEval e env a
-refineThunk _ _ = error "refineThunk: the argument is not a thunk"
+refineThunk v _
+    = error $ "refineThunk: the argument is not a thunk: " ++ show v
 
 predicate :: (AbstractValue -> Bool) -> AbstractValue -> AbstractValue
 predicate _ AbstractBottom = AbstractBottom
@@ -209,7 +218,7 @@ primReal :: AbstractValue -> AbstractValue
 primReal (AbstractScalar (Real _)) = AbstractReal
 primReal AbstractReal              = AbstractReal
 primReal AbstractBottom               = AbstractBottom
-primReal _ = error "primReal: the argument is not some real"
+primReal v = error $ "primReal: the argument is not a real " ++ show v
 
 refineEval :: CoreExpr
 	   -> AbstractEnvironment
@@ -246,7 +255,7 @@ expandApply (AbstractClosure env x e) v a
 expandApply (AbstractScalar (Primitive p)) v a
     = expandPrimitive p v a
 expandApply AbstractBottom _ _ = Analysis.empty
-expandApply _ _ _ = error "expandApply: can't expand an abstract non-function"
+expandApply v _ _ = error $ "expandApply: can't expand " ++ show v
 
 expandPrimitive :: Primitive
 		-> AbstractValue
@@ -267,14 +276,15 @@ expandIfProc (AbstractPair AbstractBoolean
     = (expandThunk t a) `Analysis.union` (expandThunk e a)
 expandIfProc AbstractBottom _
     = Analysis.empty
-expandIfProc _ _
-    = error "expandIfProc: provably a non-boolean where some boolean is expected"
+expandIfProc v _
+    = error $ "expandIfProc: the argument is not a boolean: " ++ show v
 
 expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
 expandThunk (AbstractClosure env x e) a
     -- We assume that x does not occur in e
     = Analysis.expand e env a
-expandThunk _ _ = error "expandThunk: the argument is not a thunk"
+expandThunk v _
+    = error $ "expandThunk: the argument is not a thunk: " ++ show v
 
 expandEval :: CoreExpr
 	   -> AbstractEnvironment
@@ -319,7 +329,8 @@ iterateUntilStable f x = (x:) . map snd . takeWhile (uncurry (/=)) $ zs
 
 initialAbstractEnvironment :: ScalarEnvironment -> AbstractEnvironment
 initialAbstractEnvironment constants
-    = Environment.map AbstractScalar $ primitives `Environment.union` constants
+    = Environment.map AbstractScalar
+    $ primitives `Environment.union` constants
 
 read :: String -> (CoreExpr, ScalarEnvironment)
 read = first prepare . parse
