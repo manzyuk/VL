@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 module VL.AbstractEvaluator where
 
 import VL.Common

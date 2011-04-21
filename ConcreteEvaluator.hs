@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 module VL.ConcreteEvaluator where
 
 import VL.Scalar
