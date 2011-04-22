@@ -40,7 +40,7 @@ scan ('-':c:cs)
       (cs', cs'') = scanUnsignedReal (c:cs)
 scan ['-'] = [Identifier "-"]
 
-scan s@(c:cs)
+scan s@(c:_)
     | isDigit c
     = Real (read cs' :: Float) : scan cs''
     where

@@ -3,20 +3,13 @@ module VL.Concrete.Evaluator where
 import VL.Language.Scalar
 import VL.Language.Expression
 
-import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment
 
 import VL.Language.Parser
 import VL.Language.Pretty
 import VL.Language.Prepare
 
-import VL.Alacarte.Coproduct
-import VL.Alacarte.FixedPoint
-
 import VL.Concrete.Value
-
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 import Control.Monad
 import System.IO

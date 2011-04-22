@@ -1,4 +1,4 @@
-module VL.Language.Parser where
+module VL.Language.Parser (parse) where
 
 import VL.Language.Common
 
@@ -7,16 +7,13 @@ import qualified VL.Language.Scalar as Scalar
 
 import VL.Language.Syntax
 
-import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment
 
 import VL.Language.Token (Token)
 import qualified VL.Language.Token as Token
 
-import VL.Alacarte.Coproduct
-
 import Text.Parsec.Prim       hiding (many, (<|>), State, token, parse)
-import Text.Parsec.String     hiding (Parser)
+import Text.Parsec.String     ()
 import Text.Parsec.Combinator (between)
 
 import Control.Applicative
@@ -107,7 +104,7 @@ parseEmptyList = Scalar.Nil <$ (lparen >> rparen)
 
 -- Helper combinators and aliases for better readability.
 special :: String -> Parser a -> Parser a
-special name body = symbol name *> body
+special name expr = symbol name *> expr
 
 parens :: Parser a -> Parser a
 parens = between lparen rparen

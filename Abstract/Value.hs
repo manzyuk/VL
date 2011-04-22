@@ -51,8 +51,8 @@ joinValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
       -- the free variables of the body, therefore if the bodies are
       -- equal, then the environments must contain the same set of
       -- variables.
-      joinEnvironments env1 env2
-	  = Environment.fromList $ map joinBindings (Environment.domain env1)
+      joinEnvironments env _
+	  = Environment.fromList $ map joinBindings (Environment.domain env)
       joinBindings x
 	  = (x, (Environment.lookup x env1) `joinValues` (Environment.lookup x env2))
 joinValues (AbstractPair v1 v2) (AbstractPair v1' v2')

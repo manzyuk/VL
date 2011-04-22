@@ -5,7 +5,6 @@ import VL.Language.Syntax
 import VL.Language.Expression
 
 import VL.Alacarte.Coproduct
-import VL.Alacarte.FixedPoint
 
 -- The types 'CoreSyntax' and 'CoreExpr' are isomorphic, however the
 -- latter is easier to work with.  The function 'iso' establishes an

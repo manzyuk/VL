@@ -33,8 +33,8 @@ instance Pretty CoreExpr where
 		 , pp body
 		 ]
 	where
-	  ppBinding (name, formal, body)
-	      = parens $ hang (text name <+> parens (text formal)) 1 (pp body)
+	  ppBinding (name, formal, expr)
+	      = parens $ hang (text name <+> parens (text formal)) 1 (pp expr)
 
 ppClosure :: Pretty val => Environment val -> Name -> CoreExpr -> Doc
 ppClosure env x b = internal "closure" $ pp env $+$ pp (Lam x b)
@@ -52,8 +52,8 @@ variables (Letrec bindings body)
     = (variables body) `Set.union` vs `Set.union` ns
     where
       ns = Set.fromList [ name | (name, _, _)      <- bindings ]
-      vs = Set.unions   [ Set.insert formal (variables body)
-			       | (_, formal, body) <- bindings ]
+      vs = Set.unions   [ Set.insert formal (variables expr)
+			       | (_, formal, expr) <- bindings ]
 
 freeVariables :: CoreExpr -> Set Name
 freeVariables (Var x)
@@ -69,8 +69,8 @@ freeVariables (Letrec bindings body)
     where
       ns = Set.fromList [ name
 			| (name, _, _)      <- bindings ]
-      vs = Set.unions   [ Set.delete formal (freeVariables body)
-			| (_, formal, body) <- bindings ]
+      vs = Set.unions   [ Set.delete formal (freeVariables expr)
+			| (_, formal, expr) <- bindings ]
 
 -- The evaluation rule for `letrec' is based on the following
 -- trasformation from Reynolds's "Theories of Programming

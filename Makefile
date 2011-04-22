@@ -1,6 +1,6 @@
 .PHONY: test clean
 test:
-	ghc --make -O2        \
+	ghc --make -O2 -Wall  \
 		Test/Test.hs  \
 		Language/*.hs \
 		Alacarte/*.hs \

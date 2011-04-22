@@ -36,10 +36,10 @@ union :: Eq val => Environment val -> Environment val -> Environment val
 union env1 env2 = Environment (bindings env1 `List.union` bindings env2)
 
 domain :: Environment val -> [Name]
-domain env = [x | (x, v) <- bindings env]
+domain env = [x | (x, _) <- bindings env]
 
 values :: Environment val -> [val]
-values env = [v | (x, v) <- bindings env]
+values env = [v | (_, v) <- bindings env]
 
 lookup :: Name -> Environment val -> val
 lookup x env

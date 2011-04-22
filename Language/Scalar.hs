@@ -1,6 +1,5 @@
 module VL.Language.Scalar where
 
-import VL.Language.Common
 import VL.Language.Pretty
 import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment

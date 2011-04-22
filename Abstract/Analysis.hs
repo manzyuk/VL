@@ -18,7 +18,6 @@ module VL.Abstract.Analysis
 import VL.Language.Common
 import VL.Language.Pretty hiding (empty)
 import VL.Language.Expression
-import qualified VL.Language.Environment as Environment
 
 import VL.Abstract.Value
 
@@ -84,13 +83,13 @@ singleton e env v = AbstractAnalysis $ Map.singleton (e, env) v
 
 -- Pretty-printing of analyses
 instance Pretty AbstractAnalysis where
-    pp analysis = internal "analysis" bindings
+    pp analysis = internal "analysis"
+		. vcat
+		. punctuate newline
+		. map ppBinding
+		. toList
+		$ analysis
 	where
-	  bindings = vcat
-		   . punctuate newline
-		   . map ppBinding
-		   . toList
-		   $ analysis
 	  ppBinding ((e, env), v) = sep [ ppPair e env
 					, text "==>"
 					, pp v

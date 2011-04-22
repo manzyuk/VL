@@ -11,7 +11,6 @@ import VL.Language.Common
 import VL.Language.Syntax
 
 import VL.Alacarte.Coproduct
-import VL.Alacarte.FixedPoint
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -42,11 +41,11 @@ instance Rename LambdaOneArg where
 	  arg' = maybeRename dict arg
 
 instance Rename ApplicationOneArg where
-    renameAlg dict (ApplicationOneArg operator operand)
+    renameAlg _ (ApplicationOneArg operator operand)
 	= mkApplicationOneArg operator operand
 
 instance Rename Cons where
-    renameAlg dict (Cons e1 e2) = mkCons e1 e2
+    renameAlg _ (Cons e1 e2) = mkCons e1 e2
 
 instance Rename LetrecOneArg where
     renameAlg dict (LetrecOneArg bindings body)
@@ -107,7 +106,7 @@ instance Uniquify Cons where
 
 instance Uniquify LetrecOneArg where
     uniquifyAlg (LetrecOneArg bindings body)
-	= do vs' <- sequence [ freshVarName       | v      <- vs ]
+	= do vs' <- sequence [ freshVarName       | _      <- vs ]
 	     ls' <- sequence [ uniquifyLambda u e | (u, e) <- ls ]
 	     b   <- body
 	     let dict = Map.fromList $ zip vs vs'

@@ -239,8 +239,8 @@ instance ElimList ConsStar where
     elimListAlg (ConsStar xs) = foldr' mkCons (mkVariable nil) xs
 
 foldr' :: (b -> b -> b) -> b -> [b] -> b
-foldr' step x0 []     = x0
-foldr' step x0 [x1]   = x1
+foldr' _    x0 []     = x0
+foldr' _    _  [x1]   = x1
 foldr' step x0 (x:xs) = step x (foldr' step x0 xs)
 
 instance (ElimList f, ElimList g) => ElimList (f :+: g) where

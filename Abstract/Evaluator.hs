@@ -4,7 +4,6 @@ import VL.Language.Common
 import VL.Language.Scalar
 import VL.Language.Expression
 
-import VL.Language.Environment (Environment)
 import qualified VL.Language.Environment as Environment
 
 import VL.Language.Parser
@@ -17,9 +16,6 @@ import VL.Abstract.Analysis (AbstractAnalysis)
 import qualified VL.Abstract.Analysis as Analysis
 
 import Prelude hiding (read)
-
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 import Control.Arrow
 
@@ -98,8 +94,8 @@ dyadic :: (AbstractValue -> AbstractValue -> AbstractValue)
        -> AbstractValue
        -> AbstractValue
 dyadic op (AbstractPair v1 v2) = v1 `op` v2
-dyadic op AbstractBottom = AbstractBottom
-dyadic op v = error $ "dyadic: the argument is not a pair: " ++ show v
+dyadic _  AbstractBottom = AbstractBottom
+dyadic _  v = error $ "dyadic: the argument is not a pair: " ++ show v
 
 data Abstraction a
     = Abstraction {
@@ -181,9 +177,9 @@ refineIfProc a (AbstractPair (AbstractScalar (Boolean c))
 refineIfProc a (AbstractPair AbstractBoolean
 			     (AbstractPair t e))
     = (refineThunk t a) `joinValues` (refineThunk e a)
-refineIfProc a AbstractBottom
+refineIfProc _ AbstractBottom
     = AbstractBottom
-refineIfProc a v
+refineIfProc _ v
     = error $ "refineIfProc: the argument is not a boolean: " ++ show v
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
@@ -219,7 +215,7 @@ refineEval :: CoreExpr
 	   -> AbstractEnvironment
 	   -> AbstractAnalysis
 	   -> AbstractValue
-refineEval (Var x) env a = Environment.lookup x env
+refineEval (Var x) env _ = Environment.lookup x env
 refineEval e@(Lam formal body) env a
     = AbstractClosure env' formal body
     where
@@ -344,6 +340,7 @@ interpretCompact = pprint . analyze . read
 interpretVerbose :: String -> String
 interpretVerbose = unlines . map pprint . analyze' . read
 
+interpret :: String -> String
 interpret = interpretMinimal
 
 data Verbosity
