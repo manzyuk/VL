@@ -17,7 +17,7 @@ import VL.Abstract.Value
 import VL.Abstract.Analysis (AbstractAnalysis)
 import qualified VL.Abstract.Analysis as Analysis
 
-import VL.Abstract.Evaluator
+import VL.Abstract.Evaluator hiding (float)
 
 import VL.Language.Parser (parse)
 import VL.Language.Pretty
@@ -42,13 +42,13 @@ import Debug.Trace
 -- Types
 data CType
     = CInt
-    | CDouble
+    | CFloat
     | CStruct Name [(CType, Name)]
       deriving Show
 
 getCTypeName :: CType -> Name
 getCTypeName CInt             = "int"
-getCTypeName CDouble          = "double"
+getCTypeName CFloat           = "float"
 getCTypeName (CStruct name _) = name
 
 -- Expression
@@ -56,7 +56,8 @@ data CExpr
     = CVariable Name
     | CStructCon [CExpr]
     | CSlotAccess Name Name
-    | CIntLiteral Int
+    | CIntLit Int
+    | CFloatLit Float
     | CFunctionCall Name [CExpr]
       deriving Show
 
@@ -68,7 +69,8 @@ data CStat
 
 -- Top-level declarations
 data CDecl
-    = CStructDecl Name [(CType, Name)]
+    = CGlobalDecl CType Name CExpr
+    | CStructDecl Name [(CType, Name)]
     | CFunctionDecl CType Name [(CType, Name)] [CStat]
       deriving Show
 
@@ -90,6 +92,8 @@ ppCProg :: CProg -> Doc
 ppCProg = col ppCDecl
 
 ppCDecl :: CDecl -> Doc
+ppCDecl (CGlobalDecl ty var val)
+    = text (getCTypeName ty) <+> text var <+> equals <+> ppCExpr val <> semi
 ppCDecl (CStructDecl name slots)
     = vcat [ text "typedef struct" <+> lbrace
            , nest 4 (col ppSlot slots)
@@ -116,7 +120,8 @@ ppCExpr :: CExpr -> Doc
 ppCExpr (CVariable x)             = text x
 ppCExpr (CStructCon vs)           = braces (raw ppCExpr vs)
 ppCExpr (CSlotAccess x y)         = text x <> char '.' <> text y
-ppCExpr (CIntLiteral i)           = int i
+ppCExpr (CIntLit i)               = int i
+ppCExpr (CFloatLit f)             = float f
 ppCExpr (CFunctionCall name args) = text name <> parens (raw ppCExpr args)
 
 -- Given a lookup /table/, return a lookup /function/.  The lookup
@@ -146,8 +151,8 @@ genCType :: (AbstractValue -> Name)
          -> CType
 genCType _    _    (AbstractScalar (Boolean _))     = CInt
 genCType _    _    AbstractBoolean                  = CInt
-genCType _    _    (AbstractScalar (Real _))        = CDouble
-genCType _    _    AbstractReal                     = CDouble
+genCType _    _    (AbstractScalar (Real _))        = CFloat
+genCType _    _    AbstractReal                     = CFloat
 genCType sFun _    v@(AbstractScalar (Primitive _)) = CStruct (sFun v) []
 genCType sFun _    v@(AbstractScalar Nil)           = CStruct (sFun v) []
 genCType sFun xFun v@(AbstractClosure env _ _)      = CStruct (sFun v) bs
@@ -175,6 +180,29 @@ genCStructDecl tFun mFun v
          , CFunctionDecl t (mFun v) formals body
          ]
     | otherwise = []
+
+genCValue :: (AbstractValue -> Name) -> AbstractValue -> CExpr
+genCValue mFun v@(AbstractScalar Nil)           = CFunctionCall (mFun v) []
+genCValue _    (AbstractScalar (Boolean True))  = CIntLit 1
+genCValue _    (AbstractScalar (Boolean False)) = CIntLit 0
+genCValue _    (AbstractScalar (Real r))        = CFloatLit r
+genCValue mFun v@(AbstractScalar (Primitive p)) = CFunctionCall (mFun v) []
+genCValue mFun v@(AbstractClosure env x e)      = CFunctionCall name args
+    where
+      name = mFun v
+      args = map (genCValue mFun) (Environment.values env)
+genCValue mFun v@(AbstractPair v1 v2)           = CFunctionCall name args
+    where
+      name = mFun v
+      args = [genCValue mFun v1, genCValue mFun v2]
+genCValue _    AbstractBottom = error "genCValue: AbstractBottom"
+
+genCGlobalDecl :: (AbstractValue -> CType)
+               -> (AbstractValue -> Name)
+               -> Name
+               -> AbstractValue
+               -> CDecl
+genCGlobalDecl tFun mFun x v = CGlobalDecl (tFun v) x (genCValue mFun v)
 
 genCExpr :: (Name -> Name)                           -- X
          -> (AbstractValue -> Name)                  -- M
@@ -234,7 +262,7 @@ genFunctionDecl xFun tFun mFun fFun a v env x e
       body    = [ CReturn $ genCExpr xFun mFun fFun a (Environment.insert x v env) e ]
 
 genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
-genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entryPoint]
+genCProg program@(expression, constants) = structDecls ++ functionDecls ++ globals ++ [entryPoint]
     where
       analysis = analyze program
       values   = Analysis.values analysis
@@ -261,7 +289,10 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entr
                       | (env, x, e, v) <- closureValuePairs
                       ]
       entryPoint    = CFunctionDecl CInt "main" [] [ CVariableDecl (tFun result) "result" (genCExpr xFun mFun fFun analysis environment expression)
-                                                   , CReturn (CIntLiteral 0)
+                                                   , CReturn (CIntLit 0)
                                                    ]
+      globals       = [ genCGlobalDecl tFun mFun (zencode x) v
+                      | (x, v) <- Environment.bindings . Environment.restrict (freeVariables expression) $ environment
+                      ]
       environment   = initialAbstractEnvironment constants
       result        = Analysis.lookup expression environment analysis
