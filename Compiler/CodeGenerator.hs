@@ -195,7 +195,9 @@ genCValue mFun v@(AbstractPair v1 v2)           = CFunctionCall name args
     where
       name = mFun v
       args = [genCValue mFun v1, genCValue mFun v2]
-genCValue _    AbstractBottom = error "genCValue: AbstractBottom"
+genCValue _    AbstractBoolean = error "genCValue: AbstractBoolean"
+genCValue _    AbstractReal    = error "genCValue: AbstractReal"
+genCValue _    AbstractBottom  = error "genCValue: AbstractBottom"
 
 genCGlobalDecl :: (AbstractValue -> CType)
                -> (AbstractValue -> Name)
