@@ -78,10 +78,10 @@ type CProg = [CDecl]
 
 -- Pretty-printing
 
--- Lay out items of a list in a raw, pretty-printing each item with
+-- Lay out items of a list in a row, pretty-printing each item with
 -- a supplied printer and separating by commas.
-raw :: (a -> Doc) -> [a] -> Doc
-raw printer = hsep . punctuate comma . map printer
+row :: (a -> Doc) -> [a] -> Doc
+row printer = hsep . punctuate comma . map printer
 
 -- Lay out items of a list in a column, pretty-printing each with a
 -- supplied printer.
@@ -103,7 +103,7 @@ ppCDecl (CStructDecl name slots)
       ppSlot (ty, x) = text (getCTypeName ty) <+> text x <> semi
 ppCDecl (CFunctionDecl ty name formals stats)
     = vcat [ text (getCTypeName ty) <+> text name
-                     <> parens (raw ppFormal formals) <+> lbrace
+                     <> parens (row ppFormal formals) <+> lbrace
            , nest 4 (col ppCStat stats)
            , rbrace <> semi
            ]
@@ -118,11 +118,11 @@ ppCStat (CVariableDecl ty name value)
 
 ppCExpr :: CExpr -> Doc
 ppCExpr (CVariable x)             = text x
-ppCExpr (CStructCon vs)           = braces (raw ppCExpr vs)
+ppCExpr (CStructCon vs)           = braces (row ppCExpr vs)
 ppCExpr (CSlotAccess x y)         = text x <> char '.' <> text y
 ppCExpr (CIntLit i)               = int i
 ppCExpr (CFloatLit f)             = float f
-ppCExpr (CFunctionCall name args) = text name <> parens (raw ppCExpr args)
+ppCExpr (CFunctionCall name args) = text name <> parens (row ppCExpr args)
 
 -- Given a lookup /table/, return a lookup /function/.  The lookup
 -- function signals an error when the key is not found.
