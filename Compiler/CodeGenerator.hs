@@ -282,8 +282,9 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ globa
       mFun = mkLookupFun mTbl   -- M from the paper
 
       closureValuePairs = [ (env', x, b, v)
-                          | ((App l@(Lam x b) e, env), v) <- Analysis.toList analysis
+                          | (App l@(Lam x b) e, env) <- Analysis.domain analysis
                           , let env' = Environment.restrict (freeVariables l) env
+                                v    = Analysis.lookup e env analysis
                           ]
 
       structDecls   = concatMap (genCStructDecl tFun mFun) values
