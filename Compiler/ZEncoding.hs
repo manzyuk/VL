@@ -1,4 +1,4 @@
-module VL.ZEncoding (zencode) where
+module VL.Compiler.ZEncoding (zencode) where
 
 -- Z-encoding.  See http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/SymbolNames.
 

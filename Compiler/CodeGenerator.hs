@@ -1,28 +1,30 @@
-{-# LANGUAGE PatternGuards, TypeOperators, FlexibleInstances #-}
-module VL.CodeGenerator where
+{-# LANGUAGE PatternGuards #-}
+module VL.Compiler.CodeGenerator where
 
-import VL.Common
-import VL.Scalar
-import VL.Syntax
-import VL.Coproduct
-import VL.FixedPoint
+import VL.Language.Common
+import VL.Language.Scalar
+import VL.Language.Syntax
+import VL.Language.Expression
 
-import VL.Environment (Environment)
-import qualified VL.Environment as Environment
+import VL.Alacarte.Coproduct
+import VL.Alacarte.FixedPoint
 
-import VL.AbstractValue
+import VL.Language.Environment (Environment)
+import qualified VL.Language.Environment as Environment
 
-import VL.AbstractAnalysis (AbstractAnalysis)
-import qualified VL.AbstractAnalysis as Analysis
+import VL.Abstract.Value
 
-import VL.AbstractEvaluator
+import VL.Abstract.Analysis (AbstractAnalysis)
+import qualified VL.Abstract.Analysis as Analysis
 
-import VL.Parser (parse)
-import VL.Pretty
-import VL.Prepare
+import VL.Abstract.Evaluator
 
-import VL.Uniquify
-import VL.ZEncoding
+import VL.Language.Parser (parse)
+import VL.Language.Pretty
+import VL.Language.Prepare
+
+import VL.Language.Uniquify
+import VL.Compiler.ZEncoding
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -131,13 +133,10 @@ isNonVoid = not . isVoid
 
 -- Given a lookup /table/, return a lookup /function/.  The lookup
 -- function signals an error when the key is not found.
-mkLookupFun :: (Ord k, Pretty k) => Map k v -> (k -> v)
+mkLookupFun :: (Ord k, Show k) => Map k v -> (k -> v)
 mkLookupFun table key = fromMaybe (error msg) (Map.lookup key table)
     where
-      msg = "mkLookupFun: key is not found " ++ pprint key
-
-instance Pretty (AbstractValue, AbstractValue) where
-    pp (v1, v2) = parens (pp v1 <> char ',' <+> pp v2)
+      msg = "mkLookupFun: key is not found " ++ show key
 
 -- Given a list of things, build a lookup table, giving each thing
 -- a unique name based on a prefix supplied as the first argument.
@@ -193,68 +192,40 @@ genCExpr :: (Name -> Name)                           -- X
          -> ((AbstractValue, AbstractValue) -> Name) -- F
          -> AbstractAnalysis                         -- a*
          -> AbstractEnvironment
-         -> CoreExpression
+         -> CoreExpr
          -> CExpr
-genCExpr xFun mFun fFun a env (In t)
-    = genCExprFromCoreExpr xFun mFun fFun a env t
-
-class GenCExprFromCoreExpr f where
-    genCExprFromCoreExpr :: (Name -> Name)                           -- X
-                         -> (AbstractValue -> Name)                  -- M
-                         -> ((AbstractValue, AbstractValue) -> Name) -- F
-                         -> AbstractAnalysis                         -- a*
-                         -> AbstractEnvironment
-                         -> f CoreExpression
-                         -> CExpr
-
-instance GenCExprFromCoreExpr Variable where
-    genCExprFromCoreExpr xFun mFun fFun a env (Variable x)
-        | x `elem` (Environment.domain env) -- x is bound in env
-        = CVariable (xFun x)
-        | otherwise
-        = CSlotAccess "c" (xFun x)
-
-instance GenCExprFromCoreExpr LambdaOneArg where
-    genCExprFromCoreExpr xFun mFun fFun a env (LambdaOneArg arg body)
-        = CFunctionCall name args
-        where
-          name = mFun $ Analysis.lookup (mkLambdaOneArg arg body) env a
-          args = [ CVariable x | (x, v) <- Environment.bindings env, isNonVoid v ]
-
-instance GenCExprFromCoreExpr ApplicationOneArg where
-    genCExprFromCoreExpr xFun mFun fFun a env (ApplicationOneArg e1 e2)
-        = CFunctionCall name args
-        where
-          v1   = Analysis.lookup e1 env a
-          v2   = Analysis.lookup e2 env a
-          name = fFun (v1, v2)
-          args = [ genCExpr xFun mFun fFun a env o
-                 | (o, v) <- [(e1, v1), (e2, v2)]
-                 , isNonVoid v
-                 ]
-
-instance GenCExprFromCoreExpr Cons where
-    genCExprFromCoreExpr xFun mFun fFun a env (Cons e1 e2)
-        = CFunctionCall name args
-        where
-          v1   = Analysis.lookup e1 env a
-          v2   = Analysis.lookup e2 env a
-          name = mFun $ AbstractPair v1 v2
-          args = [ genCExpr xFun mFun fFun a env e
-                 | (e, v) <- [(e1, v1), (e2, v2)]
-                 , isNonVoid v
-                 ]
-
-instance GenCExprFromCoreExpr LetrecOneArg where
-    genCExprFromCoreExpr xFun mFun fFun a env (LetrecOneArg bindings body)
-        = error "genCExprFromCoreExpr: LetrecOneArg is not supported yet"
-
-instance (GenCExprFromCoreExpr f, GenCExprFromCoreExpr g)
-    => GenCExprFromCoreExpr (f :+: g) where
-        genCExprFromCoreExpr xFun mFun fFun a env (Inl x)
-            = genCExprFromCoreExpr xFun mFun fFun a env x
-        genCExprFromCoreExpr xFun mFun fFun a env (Inr x)
-            = genCExprFromCoreExpr xFun mFun fFun a env x
+genCExpr xFun mFun fFun a env (Var x)
+    | x `elem` (Environment.domain env) -- x is bound in env
+    = CVariable (xFun x)
+    | otherwise
+    = CSlotAccess "c" (xFun x)
+genCExpr xFun mFun fFun a env e@(Lam _ _)
+    = CFunctionCall name args
+    where
+      name = mFun $ Analysis.lookup e env a
+      args = [ CVariable x | (x, v) <- Environment.bindings env, isNonVoid v ]
+genCExpr xFun mFun fFun a env (App e1 e2)
+    = CFunctionCall name args
+    where
+      v1   = Analysis.lookup e1 env a
+      v2   = Analysis.lookup e2 env a
+      name = fFun (v1, v2)
+      args = [ genCExpr xFun mFun fFun a env o
+             | (o, v) <- [(e1, v1), (e2, v2)]
+             , isNonVoid v
+             ]
+genCExpr xFun mFun fFun a env (Pair e1 e2)
+    = CFunctionCall name args
+    where
+      v1   = Analysis.lookup e1 env a
+      v2   = Analysis.lookup e2 env a
+      name = mFun $ AbstractPair v1 v2
+      args = [ genCExpr xFun mFun fFun a env e
+             | (e, v) <- [(e1, v1), (e2, v2)]
+             , isNonVoid v
+             ]
+genCExpr xFun mFun fFun a env (Letrec bindings body)
+    = error "genCExpr: LETREC is not supported yet"
 
 genFunctionDecl :: (Name -> Name)                           -- X
                 -> (AbstractValue -> CType)                 -- T
@@ -264,7 +235,7 @@ genFunctionDecl :: (Name -> Name)                           -- X
                 -> AbstractValue
                 -> AbstractEnvironment
                 -> Name
-                -> CoreExpression
+                -> CoreExpr
                 -> CDecl
 genFunctionDecl xFun tFun mFun fFun a v env x e
     = CFunctionDecl ty name formals body
@@ -275,7 +246,7 @@ genFunctionDecl xFun tFun mFun fFun a v env x e
       formals = [ (tFun v, p) | (v, p) <- [(c, "c"), (v, xFun x)], isNonVoid v ]
       body    = [ CReturn $ genCExpr xFun mFun fFun a (Environment.insert x v env) e ]
 
-genCProg :: (CoreExpression, ScalarEnvironment) -> CProg
+genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
 genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entryPoint]
     where
       analysis = analyze program
@@ -294,7 +265,11 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entr
       mTbl = mkLookupTbl "#:con-" nonVoids
       mFun = mkLookupFun mTbl   -- M from the paper
 
-      closureValuePairs = findClosureValuePairs analysis
+      closureValuePairs = [ (env', x, b, v)
+                          | ((App l@(Lam x b) e, env), v) <- Analysis.toList analysis
+                          , isNonVoid v
+                          , let env' = Environment.restrict (freeVariables l) env
+                          ]
 
       structDecls   = concatMap (genCStructDecl tFun mFun) nonVoids
       functionDecls = [ genFunctionDecl xFun tFun mFun fFun analysis v env x e
@@ -305,31 +280,3 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entr
                                                    ]
       environment   = initialAbstractEnvironment constants
       result        = Analysis.lookup expression environment analysis
-
-maybeLambdaApplication :: CoreExpression -> Maybe (Name, CoreExpression, CoreExpression)
-maybeLambdaApplication e = do
-  ApplicationOneArg operator operand <- maybeApplicationOneArg e
-  LambdaOneArg formal body <- maybeLambdaOneArg operator
-  return (formal, body, operand)
-
--- findClosureValuePairs :: AbstractAnalysis -> [(AbstractEnvironment, Name, CoreExpression, AbstractValue)]
--- findClosureValuePairs a = [ (env', x, b, v)
---                           | (Just (x, b, e), env) <- map (first maybeLambdaApplication) d
---                           , isNonVoid (Analysis.lookup (mkApplicationOneArg (mkLambdaOneArg x b) e) env a)
---                           , let v = Analysis.lookup e env a
---                           , let env' = Environment.restrict (freeVariables (mkLambdaOneArg x b)) env
---                           ]
---     where
---       d = Analysis.domain a
-
-findClosureValuePairs a = findClosureValuePairs' (Analysis.toList a)
-    where
-      findClosureValuePairs' (((e, env), v) : bindings)
-          | Just (x, b, e') <- maybeLambdaApplication e
-          , isNonVoid v
-          = let env' = Environment.restrict (Set.delete x (freeVariables b)) env
-                v'   = Analysis.lookup e' env a
-            in (env', x, b, v') : findClosureValuePairs' bindings
-          | otherwise
-          = findClosureValuePairs' bindings
-      findClosureValuePairs' [] = []
