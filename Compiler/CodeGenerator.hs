@@ -119,24 +119,12 @@ ppCExpr (CSlotAccess x y)         = text x <> char '.' <> text y
 ppCExpr (CIntLiteral i)           = int i
 ppCExpr (CFunctionCall name args) = text name <> parens (raw ppCExpr args)
 
--- Code generation
-isVoid :: AbstractValue -> Bool
-isVoid (AbstractScalar _)        = True
-isVoid AbstractReal              = False
-isVoid AbstractBoolean           = False
-isVoid (AbstractClosure env _ _) = all isVoid $ Environment.values env
-isVoid (AbstractPair v1 v2)      = isVoid v1 && isVoid v2
-isVoid AbstractBottom            = error "isVoid: AbstractBottom"
-
-isNonVoid :: AbstractValue -> Bool
-isNonVoid = not . isVoid
-
 -- Given a lookup /table/, return a lookup /function/.  The lookup
 -- function signals an error when the key is not found.
 mkLookupFun :: (Ord k, Show k) => Map k v -> (k -> v)
 mkLookupFun table key = fromMaybe (error msg) (Map.lookup key table)
     where
-      msg = "mkLookupFun: key is not found " ++ show key
+      msg = "mkLookupFun: key is not found: " ++ show key
 
 -- Given a list of things, build a lookup table, giving each thing
 -- a unique name based on a prefix supplied as the first argument.
@@ -156,20 +144,21 @@ genCType :: (AbstractValue -> Name)
          -> (Name -> Name)
          -> AbstractValue
          -> CType
-genCType _ _ v | isVoid v    = error "getCType: the argument is void"
-genCType _ _ AbstractBoolean = CInt
-genCType _ _ AbstractReal    = CDouble
-genCType sFun xFun v@(AbstractClosure env _ _) = CStruct (sFun v) bs
+genCType _    _    (AbstractScalar (Boolean _))     = CInt
+genCType _    _    AbstractBoolean                  = CInt
+genCType _    _    (AbstractScalar (Real _))        = CDouble
+genCType _    _    AbstractReal                     = CDouble
+genCType sFun _    v@(AbstractScalar (Primitive _)) = CStruct (sFun v) []
+genCType sFun _    v@(AbstractScalar Nil)           = CStruct (sFun v) []
+genCType sFun xFun v@(AbstractClosure env _ _)      = CStruct (sFun v) bs
     where
       bs = [ (genCType sFun xFun v, xFun x)
            | (x, v) <- Environment.bindings env
-           , isNonVoid v
            ]
-genCType sFun xFun v@(AbstractPair v1 v2) = CStruct (sFun v) bs
+genCType sFun xFun v@(AbstractPair v1 v2)           = CStruct (sFun v) bs
     where
       bs = [ (genCType sFun xFun v, x)
            | (x, v) <- zip ["a", "d"] [v1, v2]
-           , isNonVoid v
            ]
 
 genCStructDecl :: (AbstractValue -> CType)
@@ -203,7 +192,7 @@ genCExpr xFun mFun fFun a env e@(Lam _ _)
     = CFunctionCall name args
     where
       name = mFun $ Analysis.lookup e env a
-      args = [ CVariable x | (x, v) <- Environment.bindings env, isNonVoid v ]
+      args = [ CVariable x | (x, v) <- Environment.bindings env ]
 genCExpr xFun mFun fFun a env (App e1 e2)
     = CFunctionCall name args
     where
@@ -212,7 +201,6 @@ genCExpr xFun mFun fFun a env (App e1 e2)
       name = fFun (v1, v2)
       args = [ genCExpr xFun mFun fFun a env o
              | (o, v) <- [(e1, v1), (e2, v2)]
-             , isNonVoid v
              ]
 genCExpr xFun mFun fFun a env (Pair e1 e2)
     = CFunctionCall name args
@@ -222,7 +210,6 @@ genCExpr xFun mFun fFun a env (Pair e1 e2)
       name = mFun $ AbstractPair v1 v2
       args = [ genCExpr xFun mFun fFun a env e
              | (e, v) <- [(e1, v1), (e2, v2)]
-             , isNonVoid v
              ]
 genCExpr xFun mFun fFun a env (Letrec bindings body)
     = error "genCExpr: LETREC is not supported yet"
@@ -243,7 +230,7 @@ genFunctionDecl xFun tFun mFun fFun a v env x e
       c       = AbstractClosure env x e
       ty      = tFun $ refineApply c v a
       name    = fFun (c, v)
-      formals = [ (tFun v, p) | (v, p) <- [(c, "c"), (v, xFun x)], isNonVoid v ]
+      formals = [ (tFun v, p) | (v, p) <- [(c, "c"), (v, xFun x)] ]
       body    = [ CReturn $ genCExpr xFun mFun fFun a (Environment.insert x v env) e ]
 
 genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
@@ -251,7 +238,6 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entr
     where
       analysis = analyze program
       values   = Analysis.values analysis
-      nonVoids = filter isNonVoid values
 
       -- Build lookup tables and lookup functions for relevant data
       xTbl = Map.fromList [(n, zencode n) | n <- Set.toList (variables expression)]
@@ -260,18 +246,17 @@ genCProg program@(expression, constants) = structDecls ++ functionDecls ++ [entr
       sFun = mkLookupFun sTbl   -- S from the paper
       fTbl = mkLookupTbl "#:fun-" [ (v1, v2) | v1 <- values, v2 <- values ]
       fFun = mkLookupFun fTbl   -- F from the paper
-      tTbl = Map.fromList [(v, genCType sFun xFun v) | v <- nonVoids ]
+      tTbl = Map.fromList [(v, genCType sFun xFun v) | v <- values ]
       tFun = mkLookupFun tTbl   -- T from the paper
-      mTbl = mkLookupTbl "#:con-" nonVoids
+      mTbl = mkLookupTbl "#:con-" values
       mFun = mkLookupFun mTbl   -- M from the paper
 
       closureValuePairs = [ (env', x, b, v)
                           | ((App l@(Lam x b) e, env), v) <- Analysis.toList analysis
-                          , isNonVoid v
                           , let env' = Environment.restrict (freeVariables l) env
                           ]
 
-      structDecls   = concatMap (genCStructDecl tFun mFun) nonVoids
+      structDecls   = concatMap (genCStructDecl tFun mFun) values
       functionDecls = [ genFunctionDecl xFun tFun mFun fFun analysis v env x e
                       | (env, x, e, v) <- closureValuePairs
                       ]
