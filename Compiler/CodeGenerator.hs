@@ -12,7 +12,7 @@ import VL.Abstract.Value
 import VL.Abstract.Analysis (AbstractAnalysis)
 import qualified VL.Abstract.Analysis as Analysis
 
-import VL.Abstract.Evaluator hiding (float, unary)
+import VL.Abstract.Evaluator hiding (float, unary, arithmetic, comparison)
 
 import VL.Language.Parser (parse)
 import VL.Language.Pretty
@@ -207,51 +207,82 @@ genPrimDecl xFun tFun mFun fFun a v p
       typ  = tFun $ refineApply f v a
       name = fFun (f, v)
       formals = [ (tFun f, "f"), (tFun v, "x") ]
-      body = [ CReturn $ applyPrimitive p "x" ]
+      body = [ CReturn $ applyPrimitive p v "x" ]
       proto = CFunProto typ name formals
 
-applyPrimitive :: Primitive -> Name -> CExpr
+applyPrimitive :: Primitive -> AbstractValue -> Name -> CExpr
 applyPrimitive Car      = car
 applyPrimitive Cdr      = cdr
-applyPrimitive Add      = binary "+"
-applyPrimitive Sub      = binary "-"
-applyPrimitive Mul      = binary "*"
-applyPrimitive Div      = binary "/"
-applyPrimitive Eql      = binary "=="
-applyPrimitive Neq      = binary "!="
-applyPrimitive LTh      = binary "<"
-applyPrimitive LEq      = binary "<="
-applyPrimitive GTh      = binary ">"
-applyPrimitive GEq      = binary ">="
-applyPrimitive Exp      = unary "exp"
-applyPrimitive Log      = unary "log"
-applyPrimitive Sin      = unary "sin"
-applyPrimitive Cos      = unary "cos"
-applyPrimitive Tan      = unary "tan"
-applyPrimitive Asin     = unary "asin"
-applyPrimitive Acos     = unary "acos"
-applyPrimitive Atan     = unary "atan"
-applyPrimitive Sinh     = unary "sinh"
-applyPrimitive Cosh     = unary "cosh"
-applyPrimitive Tanh     = unary "tanh"
-applyPrimitive Sqrt     = unary "sqrt"
+applyPrimitive Add      = arithmetic (+) "+"
+applyPrimitive Sub      = arithmetic (-) "-"
+applyPrimitive Mul      = arithmetic (*) "*"
+applyPrimitive Div      = arithmetic (/) "/"
+applyPrimitive Eql      = comparison (==) "=="
+applyPrimitive Neq      = comparison (/=) "!="
+applyPrimitive LTh      = comparison (<)  "<"
+applyPrimitive LEq      = comparison (<=) "<="
+applyPrimitive GTh      = comparison (>)  ">"
+applyPrimitive GEq      = comparison (>=) ">="
+applyPrimitive Exp      = unary exp  "exp"
+applyPrimitive Log      = unary log  "log"
+applyPrimitive Sin      = unary sin  "sin"
+applyPrimitive Cos      = unary cos  "cos"
+applyPrimitive Tan      = unary tan  "tan"
+applyPrimitive Asin     = unary asin "asin"
+applyPrimitive Acos     = unary acos "acos"
+applyPrimitive Atan     = unary atan "atan"
+applyPrimitive Sinh     = unary sinh "sinh"
+applyPrimitive Cosh     = unary cosh "cosh"
+applyPrimitive Tanh     = unary tanh "tanh"
+applyPrimitive Sqrt     = unary sqrt "sqrt"
 applyPrimitive Pow      = pow
-applyPrimitive RealPrim = CVar
+applyPrimitive RealPrim = realPrim
 
-car :: Name -> CExpr
-car x = CSlotAccess x "a"
+car :: AbstractValue -> Name -> CExpr
+car (AbstractPair v@(AbstractScalar _) _) _ = genCValue v
+car _ x = CSlotAccess x "a"
 
-cdr :: Name -> CExpr
-cdr x = CSlotAccess x "d"
+cdr :: AbstractValue -> Name -> CExpr
+cdr (AbstractPair _ v@(AbstractScalar _)) _ = genCValue v
+cdr _ x = CSlotAccess x "d"
 
-pow :: Name -> CExpr
-pow x = CFunCall "pow" [car x, cdr x]
+pow :: AbstractValue -> Name -> CExpr
+pow (AbstractPair (AbstractScalar (Real r1))
+                  (AbstractScalar (Real r2))) _
+    = CDoubleLit (r1 ** r2)
+pow v x = CFunCall "pow" [car v x, cdr v x]
 
-binary :: Name -> Name -> CExpr
-binary op x = CBinaryOp op (car x) (cdr x)
+unary :: (Float -> Float) -> Name -> AbstractValue -> Name -> CExpr
+unary fun fun_name (AbstractScalar (Real r)) _
+    = CDoubleLit (fun r)
+unary _ fun_name _ x = CFunCall fun_name [CVar x]
 
-unary :: Name -> Name -> CExpr
-unary op x = CFunCall op [CVar x]
+arithmetic :: (Float -> Float -> Float)
+           -> Name
+           -> AbstractValue
+           -> Name
+           -> CExpr
+arithmetic op op_name (AbstractPair (AbstractScalar (Real r1))
+                                    (AbstractScalar (Real r2))) _
+    = CDoubleLit (r1 `op` r2)
+arithmetic op op_name v x
+    = CBinaryOp op_name (car v x) (cdr v x)
+
+comparison :: (Float -> Float -> Bool)
+           -> Name
+           -> AbstractValue
+           -> Name
+           -> CExpr
+comparison op op_name (AbstractPair (AbstractScalar (Real r1))
+                                    (AbstractScalar (Real r2))) _
+    = CIntLit . bool2int $ r1 `op` r2
+    where
+      bool2int True  = 1
+      bool2int False = 0
+
+realPrim :: AbstractValue -> Name -> CExpr
+realPrim (AbstractScalar (Real r)) _ = CDoubleLit r
+realPrim _ x = CVar x
 
 genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
 genCProg program@(expression, constants)
