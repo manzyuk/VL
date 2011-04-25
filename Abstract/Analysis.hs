@@ -19,6 +19,8 @@ import VL.Language.Common
 import VL.Language.Pretty hiding (empty)
 import VL.Language.Expression
 
+import qualified VL.Language.Environment as Environment
+
 import VL.Abstract.Value
 
 import Prelude hiding (lookup)
@@ -28,7 +30,7 @@ import qualified Data.Map as Map
 
 newtype AbstractAnalysis
     = AbstractAnalysis {
-	bindings :: Map (CoreExpr, AbstractEnvironment) AbstractValue
+        bindings :: Map (CoreExpr, AbstractEnvironment) AbstractValue
       } deriving Eq
 
 empty :: AbstractAnalysis
@@ -57,7 +59,10 @@ domain :: AbstractAnalysis -> [(CoreExpr, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
-values = Map.elems . bindings
+--values = Map.elems . bindings
+values a = concat [ v : Environment.values (Environment.restrict (freeVariables e) env)
+                  | ((e, env), v) <- toList a
+                  ]
 
 expand :: CoreExpr
        -> AbstractEnvironment
@@ -76,21 +81,21 @@ toList :: AbstractAnalysis -> [((CoreExpr, AbstractEnvironment), AbstractValue)]
 toList = Map.toList . bindings
 
 singleton :: CoreExpr
-	  -> AbstractEnvironment
-	  -> AbstractValue
-	  -> AbstractAnalysis
+          -> AbstractEnvironment
+          -> AbstractValue
+          -> AbstractAnalysis
 singleton e env v = AbstractAnalysis $ Map.singleton (e, env) v
 
 -- Pretty-printing of analyses
 instance Pretty AbstractAnalysis where
     pp analysis = internal "analysis"
-		. vcat
-		. punctuate newline
-		. map ppBinding
-		. toList
-		$ analysis
-	where
-	  ppBinding ((e, env), v) = sep [ ppPair e env
-					, text "==>"
-					, pp v
-					]
+                . vcat
+                . punctuate newline
+                . map ppBinding
+                . toList
+                $ analysis
+        where
+          ppBinding ((e, env), v) = sep [ ppPair e env
+                                        , text "==>"
+                                        , pp v
+                                        ]
