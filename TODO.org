@@ -1,0 +1,98 @@
+* More imperative approach
+
+Consider a state monad, whose state consists of:
+- a =Map= from =Name= to =Name=
+  (used to rename variables)
+- a =Map= from =AbstractValue= to =Name=
+  (used to name structs)
+- a =Map= from =(AbstractValue, AbstractValue)= to =Name=
+  (used to name applications)
+- a =Map= from =AbstractValue= to =Name=
+  (used to name struct constructors)
+- a =Map= from =AbstractValue= to =Name=
+  (used to name thunks that need to be forced)
+- a =Map= from =AbstractValue= to C types
+- a counter used to produce unique names
+
+Whenever we need a name for something, i.e., for a struct, we first
+look it up in the corresponding lookup table and return it if it is
+there, otherwise generate a new name, increment the counter, and
+return the name.
+
+So, our state is
+#+BEGIN_SRC haskell
+data Table
+    = Table { nameVar :: Map Name Name
+            , nameStr :: Map AbstractValue Name
+            , nameCon :: Map AbstractValue Name
+            , nameThk :: Map AbstractValue Name
+            , nameApp :: Map (AbstractValue, AbstractValue) Name
+            , counter :: Int
+            }
+#+END_SRC
+
+and our code generator monad is
+#+BEGIN_SRC haskell
+type CG = State Table
+
+getNameVar :: Name -> CG Name
+getNameVar x = do table <- get
+                  case (Map.lookup x (nameVar table)) of
+                    Just y  -> return y
+                    Nothing -> let i = counter table
+                                   y = "#:var-" ++ show i
+                               in do put table { nameVar = Map.insert x y (nameVar table), counter = succ i }
+                                     return y
+
+getNameStr :: AbstractValue -> CG Name
+getNameStr v = do table <- get
+                  case (Map.lookup x (nameStr table)) of
+                    Just n  -> return n
+                    Nothing -> let i = counter table
+                                   n = "#:str-" ++ show i
+                               in do put table { nameStr = Map.insert v n (nameStr table), counter = succ i }
+#+END_SRC
+and so on (Template Haskell? Lenses?).
+
+Then the type of, say, genCExpr would be
+#+BEGIN_SRC haskell
+genCExpr :: AbstractAnalysis
+         -> AbstractEnvironment
+         -> [Name]
+         -> CoreExpr
+         -> CG CExpr
+genCExpr a env fvs (Var x)
+    | x `elem` fvs
+    = CSlotAccess (CVar "c") <$> getNameStr x
+    | otherwise
+    = CVar <$> getNameStr x
+genCExpr a env fvs e@(Lam _ _)
+    = do name <- nameCon $ Analysis.lookup e env a
+         args <- sequence [ CVar <$> getNameVar x
+                          | x <- Environment.domain $ Environment.restrict (freeVariables e) env
+                          ]
+         return $ CFunCall name args
+genCExpr a env fvs (App e1 e2)
+    = do name <- getNameApp v1 v2
+         args <- sequence [ genCExpr a env fvs e
+                          | (e, v) <- [(e1, v1), (e2, v2)]
+                          ]
+         return $ CFunCall name args
+    where
+      v1 = Analysis.lookup e1 env a
+      v2 = Analysis.lookup e2 env a
+#+END_SRC
+etc.
+
+The advantage is that we don't have to precompute and thread through
+the lookup tables: they are carried around and computed on demand.
+The code does not seem to become unwieldy, too.  The lookup need not
+be total functions: if there is no name for a thing, create it!  So,
+it is also safer.
+
+Furthermore, we can wrap this state monad around a writer monad that
+is used to collect code that we generate in the process of compiling
+the program.  For example, instead of enumerating all thunks in and
+generating force functions for each of them in advance, we can
+generate these functions whenever we have to force a thunk (i.e., in
+the implementation of the IF-PROCEDURE).
