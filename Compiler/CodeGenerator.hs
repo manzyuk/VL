@@ -136,7 +136,7 @@ genCExpr :: (Name -> Name)                           -- X
          -> CExpr
 genCExpr xFun mFun fFun a env fvs (Var x)
     | x `elem` fvs
-    = CSlotAccess "c" (xFun x)
+    = CSlotAccess (CVar "c") (xFun x)
     | otherwise
     = CVar (xFun x)
 genCExpr xFun mFun fFun a env fvs e@(Lam _ _)
@@ -207,44 +207,53 @@ genPrimDecl xFun tFun mFun fFun a v p
       typ  = tFun $ refineApply f v a
       name = fFun (f, v)
       formals = [ (tFun f, "f"), (tFun v, "x") ]
-      body = [ CReturn $ applyPrimitive p v "x" ]
+      body = [ CReturn $ applyPrimitive xFun tFun mFun fFun a p v "x" ]
       proto = CFunProto typ name formals
 
-applyPrimitive :: Primitive -> AbstractValue -> Name -> CExpr
-applyPrimitive Car      = car
-applyPrimitive Cdr      = cdr
-applyPrimitive Add      = arithmetic (+) "+"
-applyPrimitive Sub      = arithmetic (-) "-"
-applyPrimitive Mul      = arithmetic (*) "*"
-applyPrimitive Div      = arithmetic (/) "/"
-applyPrimitive Eql      = comparison (==) "=="
-applyPrimitive Neq      = comparison (/=) "!="
-applyPrimitive LTh      = comparison (<)  "<"
-applyPrimitive LEq      = comparison (<=) "<="
-applyPrimitive GTh      = comparison (>)  ">"
-applyPrimitive GEq      = comparison (>=) ">="
-applyPrimitive Exp      = unary exp  "exp"
-applyPrimitive Log      = unary log  "log"
-applyPrimitive Sin      = unary sin  "sin"
-applyPrimitive Cos      = unary cos  "cos"
-applyPrimitive Tan      = unary tan  "tan"
-applyPrimitive Asin     = unary asin "asin"
-applyPrimitive Acos     = unary acos "acos"
-applyPrimitive Atan     = unary atan "atan"
-applyPrimitive Sinh     = unary sinh "sinh"
-applyPrimitive Cosh     = unary cosh "cosh"
-applyPrimitive Tanh     = unary tanh "tanh"
-applyPrimitive Sqrt     = unary sqrt "sqrt"
-applyPrimitive Pow      = pow
-applyPrimitive RealPrim = realPrim
+applyPrimitive :: (Name -> Name)
+               -> (AbstractValue -> CType)
+               -> (AbstractValue -> Name)
+               -> ((AbstractValue, AbstractValue) -> Name)
+               -> AbstractAnalysis
+               -> Primitive
+               -> AbstractValue
+               -> Name
+               -> CExpr
+applyPrimitive _ _ _ _ _ Car      = car
+applyPrimitive _ _ _ _ _ Cdr      = cdr
+applyPrimitive _ _ _ _ _ Add      = arithmetic (+) "+"
+applyPrimitive _ _ _ _ _ Sub      = arithmetic (-) "-"
+applyPrimitive _ _ _ _ _ Mul      = arithmetic (*) "*"
+applyPrimitive _ _ _ _ _ Div      = arithmetic (/) "/"
+applyPrimitive _ _ _ _ _ Eql      = comparison (==) "=="
+applyPrimitive _ _ _ _ _ Neq      = comparison (/=) "!="
+applyPrimitive _ _ _ _ _ LTh      = comparison (<)  "<"
+applyPrimitive _ _ _ _ _ LEq      = comparison (<=) "<="
+applyPrimitive _ _ _ _ _ GTh      = comparison (>)  ">"
+applyPrimitive _ _ _ _ _ GEq      = comparison (>=) ">="
+applyPrimitive _ _ _ _ _ Exp      = unary exp  "exp"
+applyPrimitive _ _ _ _ _ Log      = unary log  "log"
+applyPrimitive _ _ _ _ _ Sin      = unary sin  "sin"
+applyPrimitive _ _ _ _ _ Cos      = unary cos  "cos"
+applyPrimitive _ _ _ _ _ Tan      = unary tan  "tan"
+applyPrimitive _ _ _ _ _ Asin     = unary asin "asin"
+applyPrimitive _ _ _ _ _ Acos     = unary acos "acos"
+applyPrimitive _ _ _ _ _ Atan     = unary atan "atan"
+applyPrimitive _ _ _ _ _ Sinh     = unary sinh "sinh"
+applyPrimitive _ _ _ _ _ Cosh     = unary cosh "cosh"
+applyPrimitive _ _ _ _ _ Tanh     = unary tanh "tanh"
+applyPrimitive _ _ _ _ _ Sqrt     = unary sqrt "sqrt"
+applyPrimitive _ _ _ _ _ Pow      = pow
+applyPrimitive _ _ _ _ _ RealPrim = realPrim
+applyPrimitive xFun tFun mFun fFun a IfProc   = ifProc xFun tFun mFun fFun a
 
 car :: AbstractValue -> Name -> CExpr
 car (AbstractPair v@(AbstractScalar _) _) _ = genCValue v
-car _ x = CSlotAccess x "a"
+car _ x = CSlotAccess (CVar x) "a"
 
 cdr :: AbstractValue -> Name -> CExpr
 cdr (AbstractPair _ v@(AbstractScalar _)) _ = genCValue v
-cdr _ x = CSlotAccess x "d"
+cdr _ x = CSlotAccess (CVar x) "d"
 
 pow :: AbstractValue -> Name -> CExpr
 pow (AbstractPair (AbstractScalar (Real r1))
@@ -279,10 +288,45 @@ comparison op op_name (AbstractPair (AbstractScalar (Real r1))
     where
       bool2int True  = 1
       bool2int False = 0
+comparison op op_name v x
+    = CBinaryOp op_name (car v x) (cdr v x)
 
 realPrim :: AbstractValue -> Name -> CExpr
 realPrim (AbstractScalar (Real r)) _ = CDoubleLit r
 realPrim _ x = CVar x
+
+-- The following implementation is wrong.  What we actually need to do
+-- is this: enumerate all thunks appearing in the analysis  (i.e., all
+-- abstract closures in which the formal parameter does not occur free
+-- in the body), and for each thunk generate a function that takes one
+-- argument, that thunk, and whose body is the body of the thunk
+-- compiled in the environment of the thunk.
+ifProc :: (Name -> Name)
+       -> (AbstractValue -> CType)
+       -> (AbstractValue -> Name)
+       -> ((AbstractValue, AbstractValue) -> Name)
+       -> AbstractAnalysis
+       -> AbstractValue -> Name -> CExpr
+ifProc xFun tFun mFun fFun a
+           (AbstractPair (AbstractScalar (Boolean True))
+                     (AbstractPair v@(AbstractClosure env x e) _)) _
+    = force xFun mFun fFun a v
+ifProc xFun tFun mFun fFun a
+           (AbstractPair (AbstractScalar (Boolean False))
+                     (AbstractPair _ v@(AbstractClosure env x e))) _
+    = force xFun mFun fFun a v
+ifProc xFun tFun mFun fFun a
+           (AbstractPair AbstractBoolean (AbstractPair v1 v2)) x
+    = CTernaryCond c t e
+    where
+      c = CSlotAccess (CVar x) "a"
+      t = force xFun mFun fFun a v1
+      e = force xFun mFun fFun a v2
+
+force xFun mFun fFun a (AbstractClosure env x e)
+    = genCExpr xFun mFun fFun a env [] e
+force xFun mFun fFun a v
+    = error $ "force: the argument is not a thunk: " ++ show v
 
 genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
 genCProg program@(expression, constants)
