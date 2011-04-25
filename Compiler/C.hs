@@ -14,13 +14,14 @@ data CType
 data CExpr
     = CVar Name
     | CStructCon [CExpr]
-    | CSlotAccess Name Name
+    | CSlotAccess CExpr Name
     | CIntLit Int
     -- TODO: Change Float to Double in the rest of the
     -- code and get rid of the following discrepancy.
     | CDoubleLit Float
     | CFunCall Name [CExpr]
     | CBinaryOp Name CExpr CExpr
+    | CTernaryCond CExpr CExpr CExpr
       deriving Show
 
 -- Statements
@@ -69,11 +70,17 @@ instance Pretty CType where
 instance Pretty CExpr where
     pp (CVar x)                = text x
     pp (CStructCon slots)      = braces (row pp slots)
-    pp (CSlotAccess name slot) = text name <> dot <> text slot
+    pp (CSlotAccess expr slot) = pp expr <> dot <> text slot
     pp (CIntLit i)             = int i
     pp (CDoubleLit f)          = float f
     pp (CFunCall name args)    = text name <> parens (row pp args)
     pp (CBinaryOp op x y)      = parens (pp x <+> text op <+> pp y)
+    pp (CTernaryCond a b c)    = sep [ pp a
+                                     , char '?'
+                                     , pp b
+                                     , colon
+                                     , pp c
+                                     ]
 
 instance Pretty CStat where
     pp (CReturn e)
