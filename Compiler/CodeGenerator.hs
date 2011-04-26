@@ -167,7 +167,7 @@ genCExpr (Var x) env fvs
 genCExpr e@(Lam _ _) env fvs
     = do closure@(AbstractClosure closure_env _ _) <- Analysis.lookup e env <$> analysis
          fun_name <- getConName closure
-         let args = [CVar (zencode x) | (x, _) <- Environment.bindings closure_env]
+         args <- sequence [genCExpr (Var x) env fvs | x <- Environment.domain closure_env]
          return $ CFunCall fun_name args
 genCExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
