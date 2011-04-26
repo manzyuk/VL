@@ -5,11 +5,12 @@ import VL.Language.Expression
 
 import qualified VL.Language.Environment as Environment
 
-import VL.Language.Parser
 import VL.Language.Pretty
-import VL.Language.Prepare
+import VL.Language.Read
 
 import VL.Concrete.Value
+
+import Prelude hiding (read)
 
 import Control.Monad
 import System.IO
@@ -88,21 +89,21 @@ unary _ v = error $ "unary: the argument is not a real: " ++ show v
 
 arithmetic :: (Float -> Float -> Float) -> ConcreteValue -> ConcreteValue
 arithmetic op (ConcretePair (ConcreteScalar (Real r1))
-			    (ConcreteScalar (Real r2)))
+                            (ConcreteScalar (Real r2)))
     = ConcreteScalar (Real (r1 `op` r2))
 arithmetic _ v
     = error $ "arithmetic: the argument is not a pair of reals: " ++ show v
 
 comparison :: (Float -> Float -> Bool) -> ConcreteValue -> ConcreteValue
 comparison op (ConcretePair (ConcreteScalar (Real r1))
-			    (ConcreteScalar (Real r2)))
+                            (ConcreteScalar (Real r2)))
     = ConcreteScalar (Boolean (r1 `op` r2))
 comparison _ v
     = error $ "comparison: the argument is not a pair of reals: " ++ show v
 
 primIfProc :: ConcreteValue -> ConcreteValue
 primIfProc (ConcretePair (ConcreteScalar (Boolean c))
-			 (ConcretePair t e))
+                         (ConcretePair t e))
     | c
     = force t
     | otherwise
@@ -129,11 +130,10 @@ primReal v@(ConcreteScalar (Real _)) = v
 primReal v = error $ "primReal: the argument is not a real: " ++ show v
 
 interpret :: String -> String
-interpret input = pprint $ eval (prepare expression) environment
+interpret input = pprint $ eval expression concreteEnvironment
     where
-      (expression, constants) = parse input
-      environment = Environment.map ConcreteScalar
-		  $ primitives `Environment.union` constants
+      (expression, environment) = read input
+      concreteEnvironment = Environment.map ConcreteScalar environment
 
 interpreter :: IO ()
 interpreter = do
@@ -142,8 +142,8 @@ interpreter = do
   forever . handle (\e -> print (e :: ErrorCall)) $ repl
     where
       repl = do
-	putStr prompt
-	input <- getLine
-	putStrLn $ interpret input
+        putStr prompt
+        input <- getLine
+        putStrLn $ interpret input
 
       prompt = "vl> "
