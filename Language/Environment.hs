@@ -8,6 +8,7 @@ module VL.Language.Environment
     , lookup
     , insert
     , update
+    , mapKeys
     , bindings
     , restrict
     , fromList
@@ -45,7 +46,7 @@ lookup :: Name -> Environment val -> val
 lookup x env
     = fromMaybe (error msg) (List.lookup x (bindings env))
       where
-	msg = "Unbound variable: " ++ x
+        msg = "Unbound variable: " ++ x
 
 insert :: Name -> val -> Environment val -> Environment val
 insert x v env = Environment ((x, v) : bindings env)
@@ -55,9 +56,9 @@ update x v env = maybe (insert x v env) (const env) (List.lookup x (bindings env
 
 restrict :: Set Name -> Environment val -> Environment val
 restrict set env = Environment [ (x, v)
-			       | (x, v) <- bindings env
-			       , x `Set.member` set
-			       ]
+                               | (x, v) <- bindings env
+                               , x `Set.member` set
+                               ]
 
 fromList :: [(Name, val)] -> Environment val
 fromList = Environment
@@ -68,8 +69,11 @@ singleton x v = Environment [(x, v)]
 map :: (val1 -> val2) -> Environment val1 -> Environment val2
 map f = Environment . List.map (second f) . bindings
 
+mapKeys :: (Name -> Name) -> Environment val -> Environment val
+mapKeys f = Environment . List.map (first f) . bindings
+
 -- Pretty-printing of environments
 instance Pretty val => Pretty (Environment val) where
     pp = ppList . List.map ppBinding . bindings
-	where
-	  ppBinding (x, v) = ppPair x v
+        where
+          ppBinding (x, v) = ppPair x v
