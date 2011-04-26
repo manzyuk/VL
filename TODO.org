@@ -14,7 +14,7 @@ Consider a state monad, whose state consists of:
 - a =Map= from =AbstractValue= to C types
 - a counter used to produce unique names
 
-Whenever we need a name for something, i.e., for a struct, we first
+Whenever we need a name for something, e.g., for a struct, we first
 look it up in the corresponding lookup table and return it if it is
 there, otherwise generate a new name, increment the counter, and
 return the name.
