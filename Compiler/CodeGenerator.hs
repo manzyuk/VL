@@ -165,7 +165,8 @@ genCExpr (Var x) env fvs
     | otherwise
     = return $ CVar (zencode x)
 genCExpr e@(Lam _ _) env fvs
-    = do closure@(AbstractClosure closure_env _ _) <- Analysis.lookup e env <$> analysis
+    = do closure@(AbstractClosure closure_env _ _) <- (do v <- Analysis.lookup e env <$> analysis
+                                                          return $ trace ("genCExpr: " ++ show e ++ " in " ++ show env) v)
          fun_name <- getConName closure
          args <- sequence [genCExpr (Var x) env fvs | x <- Environment.domain closure_env]
          return $ CFunCall fun_name args
@@ -344,7 +345,7 @@ cdar x = CSlotAccess (CSlotAccess (CVar x) "d") "a"
 cddr :: Name -> CExpr
 cddr x = CSlotAccess (CSlotAccess (CVar x) "d") "d"
 
--- Compile thunks
+-- Thunks
 type Thunk = (AbstractEnvironment, Name, CoreExpr)
 
 compileThunk :: Thunk -> CG (CDecl, CDecl)
