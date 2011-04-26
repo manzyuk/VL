@@ -1,3 +1,4 @@
+# -*- mode: org -*-
 * More imperative approach
 
 Consider a state monad, whose state consists of:
