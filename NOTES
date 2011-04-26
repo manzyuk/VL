@@ -97,3 +97,23 @@ the program.  For example, instead of enumerating all thunks in and
 generating force functions for each of them in advance, we can
 generate these functions whenever we have to force a thunk (i.e., in
 the implementation of the IF-PROCEDURE).
+
+* Forcing thunks
+
+Because of the constant conversion, a thunk cannot be forced in the
+usual way, i.e., by applying it to the empty list (because there is no
+such thing as the empty list at the level of expressions).  There are
+several ways to work around this problem.  For example, we could apply
+a thunk to a variable that is bound to the empty list.  However, there
+may be no such variable in the environment of the thunk, and
+introducing it is somewhat tricky.  For example, we could generate a
+fresh variable and bind it to the empty list every time we force a
+thunk.  However, I suspect that this will screw up the flow analysis.
+We could try to enforce the condition that every environment contains
+a distinguished variable =#:nil= bound to the empty list, and that the
+environment of any closure contains only free variables of the closure
+and =#:nil=.  This might actually work.  Or we could observe that
+forcing a thunk =(\dummy -> e, env)= is equivalent to evaluating the
+body =e= of the thunk in the environment =env= of the thunk.  I have
+chosen the latter approach for both the concrete and abstract
+evaluator, however it seems to present problems in the code generator.
