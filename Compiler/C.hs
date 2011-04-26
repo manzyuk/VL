@@ -55,7 +55,7 @@ type CProg = [CDecl]
 -- Lay out items of a list in a row, pretty-printing each item with
 -- a supplied printer and separating by commas.
 row :: (a -> Doc) -> [a] -> Doc
-row printer = hsep . punctuate comma . map printer
+row printer = sep . punctuate comma . map printer
 
 -- Lay out items of a list in a column, pretty-printing each with a
 -- supplied printer.

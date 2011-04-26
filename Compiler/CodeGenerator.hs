@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 module VL.Compiler.CodeGenerator where
 
 import VL.Language.Common
@@ -7,377 +6,403 @@ import VL.Language.Expression
 
 import qualified VL.Language.Environment as Environment
 
+import VL.Language.Read
+import VL.Language.Pretty
+
 import VL.Abstract.Value
+import VL.Abstract.Evaluator hiding (arithmetic, comparison, unary)
 
 import VL.Abstract.Analysis (AbstractAnalysis)
 import qualified VL.Abstract.Analysis as Analysis
 
-import VL.Abstract.Evaluator hiding (float, unary, arithmetic, comparison)
-
-import VL.Language.Parser (parse)
-import VL.Language.Pretty
-import VL.Language.Prepare
-
-import VL.Language.Uniquify
-
 import VL.Compiler.C
 import VL.Compiler.ZEncoding
+
+import Prelude hiding (read)
+
+import Data.List
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Data.List
-
 import Control.Monad
-import Control.Arrow (first, second)
+import Control.Monad.State
+import Control.Monad.Reader
+
+import Control.Applicative
 
 import Debug.Trace
 
--- Given a lookup /table/, return a lookup /function/.  The lookup
--- function signals an error when the key is not found.
-mkLookupFun :: (Ord k, Show k) => Map k v -> (k -> v)
-mkLookupFun table key = fromMaybe (error msg) (Map.lookup key table)
+data Table = Table { strName :: Map AbstractValue Name
+                   , conName :: Map AbstractValue Name
+                   , thkName :: Map AbstractValue Name
+                   , appName :: Map (AbstractValue, AbstractValue) Name
+                   , counter :: Int
+                   }
+
+type CG = ReaderT AbstractAnalysis (State Table)
+
+runCG :: CG a -> AbstractAnalysis -> a
+runCG = (flip evalState emptyTable .). runReaderT
     where
-      msg = "mkLookupFun: key is not found: " ++ show key
+      emptyTable = Table { strName = Map.empty
+                         , conName = Map.empty
+                         , thkName = Map.empty
+                         , appName = Map.empty
+                         , counter = 0
+                         }
 
--- Given a list of things, build a lookup table, giving each thing
--- a unique name based on a prefix supplied as the first argument.
-mkLookupTbl :: Ord k => String -> [k] -> Map k Name
-mkLookupTbl prefix keys
-    = evalSupply $ do
-        alist <- sequence [ liftM2 (,) (return k) (freshName prefix)
-                          | k <- keys
-                          ]
-        let table = Map.fromList $ map (second zencode) alist
-        return table
+analysis :: CG AbstractAnalysis
+analysis = ask
 
--- Given a map from abstract values to C identifiers and a map from
--- VL variables to C identifiers, build a C type corresponding to
--- a given abstract value.
-genCType :: (AbstractValue -> Name)
-         -> (Name -> Name)
-         -> AbstractValue
-         -> CType
-genCType _    _    (AbstractScalar (Boolean _))     = CInt
-genCType _    _    AbstractBoolean                  = CInt
-genCType _    _    (AbstractScalar (Real _))        = CDouble
-genCType _    _    AbstractReal                     = CDouble
-genCType sFun _    v@(AbstractScalar (Primitive _)) = CStruct (sFun v) []
-genCType sFun _    v@(AbstractScalar Nil)           = CStruct (sFun v) []
-genCType sFun xFun v@(AbstractClosure env _ _)      = CStruct (sFun v) bs
-    where
-      bs = [ (genCType sFun xFun v, xFun x)
-           | (x, v) <- Environment.bindings env
-           ]
-genCType sFun xFun v@(AbstractPair car cdr)         = CStruct (sFun v) bs
-    where
-      bs = [ (genCType sFun xFun v, x)
-           | (x, v) <- [("a", car), ("d", cdr)]
-           ]
+getStrName :: AbstractValue -> CG Name
+getStrName v
+    = do table <- get
+         case Map.lookup v (strName table) of
+           Just n  -> return n
+           Nothing -> let i = counter table
+                          n = zencode $ "#:str-" ++ show i
+                      in do put table { strName = Map.insert v n (strName table)
+                                      , counter = succ i
+                                      }
+                            return n
 
--- Given an abstract value, if its associated C type is a struct,
--- generate a code that declares that struct type and defines a
--- constructor for it.
-genCStructDecl :: (AbstractValue -> CType)
-               -> (AbstractValue -> Name)
-               -> AbstractValue
-               -> CProg
-genCStructDecl tFun mFun v
-    | typ@(CStruct name slots) <- tFun v
-    = [ CStructDecl name slots
-      , CFunDecl (CFunProto typ (mFun v) slots)
-                 [ CLocalVarDecl typ "result"
-                     (CStructCon . map (CVar . snd) $ slots)
-                 , CReturn (CVar "result")
-                 ]
-      ]
-    | otherwise = []
+getConName :: AbstractValue -> CG Name
+getConName v
+    = do table <- get
+         case Map.lookup v (conName table) of
+           Just n  -> return n
+           Nothing -> let i = counter table
+                          n = zencode $ "#:con-" ++ show i
+                      in do put table { conName = Map.insert v n (conName table)
+                                      , counter = succ i
+                                      }
+                            return n
 
--- Turn a concrete value into a C value.
-genCValue :: AbstractValue -> CExpr
-genCValue (AbstractScalar Nil)             = CStructCon []
-genCValue (AbstractScalar (Boolean True))  = CIntLit 1
-genCValue (AbstractScalar (Boolean False)) = CIntLit 0
-genCValue (AbstractScalar (Real r))        = CDoubleLit r
-genCValue (AbstractScalar (Primitive _))   = CStructCon []
-genCValue (AbstractClosure _ _ _ )         = error "genCValue: AbstractClosure"
-genCValue (AbstractPair _ _)               = error "genCValue: AbstractPair"
-genCValue AbstractBoolean                  = error "genCValue: AbstractBoolean"
-genCValue AbstractReal                     = error "genCValue: AbstractReal"
-genCValue AbstractBottom                   = error "genCValue: AbstractBottom"
+getThkName :: AbstractValue -> CG Name
+getThkName v
+    = do table <- get
+         case Map.lookup v (thkName table) of
+           Just n  -> return n
+           Nothing -> let i = counter table
+                          n = zencode $ "#:thk-" ++ show i
+                      in do put table { thkName = Map.insert v n (thkName table)
+                                      , counter = succ i
+                                      }
+                            return n
 
--- Given a name and a concrete value it is bound to,  generate a code
--- for declaring a global variable with the given name and initiating
--- to the corresponding C value.
-genCGlobalVarDecl :: (AbstractValue -> CType)
-                  -> Name
-                  -> AbstractValue
-                  -> CDecl
-genCGlobalVarDecl tFun x v
-    = CGlobalVarDecl (tFun v) x (genCValue v)
+getAppName :: AbstractValue -> AbstractValue -> CG Name
+getAppName v1 v2
+    = do table <- get
+         case Map.lookup (v1, v2) (appName table) of
+           Just n  -> return n
+           Nothing -> let i = counter table
+                          n = zencode $ "#:app-" ++ show i
+                      in do put table { appName = Map.insert (v1, v2) n (appName table)
+                                      , counter = succ i
+                                      }
+                            return n
 
--- 'genCExpr' is C from the paper
---
--- The 6th argument is a list of variables that are free in the given
--- context.  Because 'genCExpr' is only called to generate bodies of
--- the functions corresponding to closure applications, this argument
--- will usually be the list of variables bound by the environment of
--- the closure, or the empty list for the 'main' function.
-genCExpr :: (Name -> Name)                           -- X
-         -> (AbstractValue -> Name)                  -- M
-         -> ((AbstractValue, AbstractValue) -> Name) -- F
-         -> AbstractAnalysis                         -- a*
-         -> AbstractEnvironment
-         -> [Name]
-         -> CoreExpr
-         -> CExpr
-genCExpr xFun mFun fFun a env fvs (Var x)
+typeOf :: AbstractValue -> CG CType
+typeOf (AbstractScalar (Boolean _)) = return CInt
+typeOf AbstractBoolean              = return CInt
+typeOf (AbstractScalar (Real _))    = return CDouble
+typeOf AbstractReal                 = return CDouble
+typeOf u@(AbstractScalar (Primitive _))
+    = do str_name <- getStrName u
+         return $ CStruct str_name []
+typeOf u@(AbstractScalar Nil)
+    = do str_name <- getStrName u
+         return $ CStruct str_name []
+typeOf u@(AbstractClosure env _ _)
+    = do str_name <- getStrName u
+         members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
+                              | (x, v) <- Environment.bindings env
+                              ]
+         return $ CStruct str_name members
+typeOf u@(AbstractPair car cdr)
+    = do str_name <- getStrName u
+         members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
+                              | (x, v) <- [("a", car), ("d", cdr)]
+                              ]
+         return $ CStruct str_name members
+typeOf AbstractBottom = error "typeOf: AbstractBottom"
+
+genCStructDecl :: AbstractValue -> CG CProg
+genCStructDecl v
+    = do typ <- typeOf v
+         case typ of
+           CStruct str_name members ->
+               do con_name <- getConName v
+                  let proto = CFunProto typ con_name members
+                      body  = [ CLocalVarDecl typ "result" . CStructCon $
+                                [ CVar var | (_, var) <- members ]
+                              , CReturn (CVar "result")
+                              ]
+                  return [CStructDecl str_name members, CFunDecl proto body]
+           _ -> return []
+
+valueOf :: AbstractValue -> CExpr
+valueOf (AbstractScalar s) = case s of
+                               Nil           -> CStructCon []
+                               Boolean True  -> CIntLit 1
+                               Boolean False -> CIntLit 0
+                               Real r        -> CDoubleLit r
+                               Primitive _   -> CStructCon []
+valueOf _ = error "valueOf: non-solved abstract value"
+
+genCGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
+genCGlobalVarDecl x v
+    = do typ <- typeOf v
+         return $ CGlobalVarDecl typ (zencode x) (valueOf v)
+
+genCExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
+genCExpr (Var x) env fvs
     | x `elem` fvs
-    = CSlotAccess (CVar "c") (xFun x)
+    = return $ CSlotAccess (CVar "c") (zencode x)
     | otherwise
-    = CVar (xFun x)
-genCExpr xFun mFun fFun a env fvs e@(Lam _ _)
-    = CFunCall name args
-    where
-      name = mFun $ Analysis.lookup e env a
-      args = [ CVar (zencode x)
-             | (x, v) <- Environment.bindings $ Environment.restrict (freeVariables e) env
-             ]
-genCExpr xFun mFun fFun a env fvs (App e1 e2)
-    = CFunCall name args
-    where
-      v1   = Analysis.lookup e1 env a
-      v2   = Analysis.lookup e2 env a
-      name = fFun (v1, v2)
-      args = [ genCExpr xFun mFun fFun a env fvs o
-             | (o, v) <- [(e1, v1), (e2, v2)]
-             ]
-genCExpr xFun mFun fFun a env fvs (Pair e1 e2)
-    = CFunCall name args
-    where
-      v1   = Analysis.lookup e1 env a
-      v2   = Analysis.lookup e2 env a
-      name = mFun $ AbstractPair v1 v2
-      args = [ genCExpr xFun mFun fFun a env fvs e
-             | (e, v) <- [(e1, v1), (e2, v2)]
-             ]
-genCExpr xFun mFun fFun a env fvs (Letrec bindings body)
+    = return $ CVar (zencode x)
+genCExpr e@(Lam _ _) env fvs
+    = do closure@(AbstractClosure closure_env _ _) <- Analysis.lookup e env <$> analysis
+         fun_name <- getConName closure
+         let args = [CVar (zencode x) | (x, _) <- Environment.bindings closure_env]
+         return $ CFunCall fun_name args
+genCExpr (App e1 e2) env fvs
+    = do v1 <- Analysis.lookup e1 env <$> analysis
+         v2 <- Analysis.lookup e2 env <$> analysis
+         fun_name <- getAppName v1 v2
+         c1 <- genCExpr e1 env fvs
+         c2 <- genCExpr e2 env fvs
+         return $ CFunCall fun_name [c1, c2]
+genCExpr e@(Pair e1 e2) env fvs
+    = do pair <- Analysis.lookup e env <$> analysis
+         fun_name <- getConName pair
+         c1 <- genCExpr e1 env fvs
+         c2 <- genCExpr e2 env fvs
+         return $ CFunCall fun_name [c1, c2]
+genCExpr (Letrec bindings body) env fvs
     = error "genCExpr: LETREC is not supported yet"
 
--- Generate a prototype declaration and a definition of the function
--- corresponding to the application of an abstract closure (given by
--- its abstract environment, name of the formal parameter and body)
--- to an abstract value.
-genFunDecl :: (Name -> Name)                           -- X
-           -> (AbstractValue -> CType)                 -- T
-           -> (AbstractValue -> Name)                  -- M
-           -> ((AbstractValue, AbstractValue) -> Name) -- F
-           -> AbstractAnalysis                         -- a*
-           -> AbstractValue
-           -> AbstractEnvironment
-           -> Name
-           -> CoreExpr
-           -> (CDecl, CDecl)
-genFunDecl xFun tFun mFun fFun a v env x e
-    = (CFunProtoDecl proto, CFunDecl proto body)
+-- Closure applications
+type ClosureValuePair = (AbstractEnvironment, Name, CoreExpr, AbstractValue)
+
+compileClosureApplication :: ClosureValuePair -> CG (CDecl, CDecl)
+compileClosureApplication (env, x, e, v)
+    = do ret_type <- typeOf =<< (refineApply closure v <$> analysis)
+         fun_name <- getAppName closure v
+         formals  <- sequence [ liftM2 (,) (typeOf val) (return var)
+                              | (val, var) <- [(closure, "c"), (v, zencode x)]
+                              ]
+         ret_stat <- CReturn <$> genCExpr e (Environment.insert x v env) (Environment.domain env)
+         let proto = CFunProto ret_type fun_name formals
+         return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
-      c       = AbstractClosure env x e
-      ty      = tFun $ refineApply c v a
-      name    = fFun (c, v)
-      formals = [ (tFun v, p) | (v, p) <- [(c, "c"), (v, xFun x)] ]
-      body    = [ CReturn $ genCExpr xFun mFun fFun a (Environment.insert x v env) (Environment.domain env) e ]
-      proto   = CFunProto ty name formals
+      closure = AbstractClosure env x e
 
--- Ditto for the application of a primitive to an abstract value.
-genPrimDecl :: (Name -> Name)
-            -> (AbstractValue -> CType)
-            -> (AbstractValue -> Name)
-            -> ((AbstractValue, AbstractValue) -> Name)
-            -> AbstractAnalysis
-            -> AbstractValue
-            -> Primitive
-            -> (CDecl, CDecl)
-genPrimDecl xFun tFun mFun fFun a v p
-    = (CFunProtoDecl proto, CFunDecl proto body)
+enumClosureValuePairs :: CG [ClosureValuePair]
+enumClosureValuePairs
+    = do a <- analysis
+         return $ nub [ (closure_env, closure_formal, closure_body, operand_value)
+                      | (App operator@(Lam _ _) operand, env) <- Analysis.domain a
+                      , let (AbstractClosure closure_env closure_formal closure_body)
+                              = Analysis.lookup operator env a
+                            operand_value
+                              = Analysis.lookup operand  env a
+                      ]
+
+compileClosureApplications :: CG [(CDecl, CDecl)]
+compileClosureApplications = enumClosureValuePairs >>= mapM compileClosureApplication
+
+-- Primitive applications
+type PrimitiveValuePair = (Primitive, AbstractValue)
+
+compilePrimitiveApplication :: PrimitiveValuePair -> CG (CDecl, CDecl)
+compilePrimitiveApplication (p, v)
+    = do ret_type <- typeOf =<< (refineApply primitive v <$> analysis)
+         fun_name <- getAppName primitive v
+         formals  <- sequence [ liftM2 (,) (typeOf val) (return var)
+                              | (val, var) <- [(primitive, "dummy"), (v, "x")]
+                              ]
+         ret_stat <- CReturn <$> compilePrimitiveExpr p v "x"
+         let proto = CFunProto ret_type fun_name formals
+         return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
-      f    = AbstractScalar (Primitive p)
-      typ  = tFun $ refineApply f v a
-      name = fFun (f, v)
-      formals = [ (tFun f, "f"), (tFun v, "x") ]
-      body = [ CReturn $ applyPrimitive xFun tFun mFun fFun a p v "x" ]
-      proto = CFunProto typ name formals
+      primitive = AbstractScalar (Primitive p)
 
-applyPrimitive :: (Name -> Name)
-               -> (AbstractValue -> CType)
-               -> (AbstractValue -> Name)
-               -> ((AbstractValue, AbstractValue) -> Name)
-               -> AbstractAnalysis
-               -> Primitive
-               -> AbstractValue
-               -> Name
-               -> CExpr
-applyPrimitive _ _ _ _ _ Car      = car
-applyPrimitive _ _ _ _ _ Cdr      = cdr
-applyPrimitive _ _ _ _ _ Add      = arithmetic (+) "+"
-applyPrimitive _ _ _ _ _ Sub      = arithmetic (-) "-"
-applyPrimitive _ _ _ _ _ Mul      = arithmetic (*) "*"
-applyPrimitive _ _ _ _ _ Div      = arithmetic (/) "/"
-applyPrimitive _ _ _ _ _ Eql      = comparison (==) "=="
-applyPrimitive _ _ _ _ _ Neq      = comparison (/=) "!="
-applyPrimitive _ _ _ _ _ LTh      = comparison (<)  "<"
-applyPrimitive _ _ _ _ _ LEq      = comparison (<=) "<="
-applyPrimitive _ _ _ _ _ GTh      = comparison (>)  ">"
-applyPrimitive _ _ _ _ _ GEq      = comparison (>=) ">="
-applyPrimitive _ _ _ _ _ Exp      = unary exp  "exp"
-applyPrimitive _ _ _ _ _ Log      = unary log  "log"
-applyPrimitive _ _ _ _ _ Sin      = unary sin  "sin"
-applyPrimitive _ _ _ _ _ Cos      = unary cos  "cos"
-applyPrimitive _ _ _ _ _ Tan      = unary tan  "tan"
-applyPrimitive _ _ _ _ _ Asin     = unary asin "asin"
-applyPrimitive _ _ _ _ _ Acos     = unary acos "acos"
-applyPrimitive _ _ _ _ _ Atan     = unary atan "atan"
-applyPrimitive _ _ _ _ _ Sinh     = unary sinh "sinh"
-applyPrimitive _ _ _ _ _ Cosh     = unary cosh "cosh"
-applyPrimitive _ _ _ _ _ Tanh     = unary tanh "tanh"
-applyPrimitive _ _ _ _ _ Sqrt     = unary sqrt "sqrt"
-applyPrimitive _ _ _ _ _ Pow      = pow
-applyPrimitive _ _ _ _ _ RealPrim = realPrim
-applyPrimitive xFun tFun mFun fFun a IfProc   = ifProc xFun tFun mFun fFun a
+enumPrimitiveValuePairs :: CG [PrimitiveValuePair]
+enumPrimitiveValuePairs
+    = do a <- analysis
+         return $ nub [ (primitive, operand_value)
+                      | (App (Var p) operand, env) <- Analysis.domain a
+                      , AbstractScalar (Primitive primitive) <- [Environment.lookup p env]
+                      , let operand_value
+                              = Analysis.lookup operand  env a
+                      ]
 
-car :: AbstractValue -> Name -> CExpr
-car (AbstractPair v@(AbstractScalar _) _) _ = genCValue v
-car _ x = CSlotAccess (CVar x) "a"
+compilePrimitiveApplications :: CG [(CDecl, CDecl)]
+compilePrimitiveApplications = enumPrimitiveValuePairs >>= mapM compilePrimitiveApplication
 
-cdr :: AbstractValue -> Name -> CExpr
-cdr (AbstractPair _ v@(AbstractScalar _)) _ = genCValue v
-cdr _ x = CSlotAccess (CVar x) "d"
+compilePrimitiveExpr :: Primitive -> AbstractValue -> Name -> CG CExpr
+compilePrimitiveExpr Car = car
+compilePrimitiveExpr Cdr = cdr
+compilePrimitiveExpr Add = arithmetic (+) "+"
+compilePrimitiveExpr Sub = arithmetic (-) "-"
+compilePrimitiveExpr Mul = arithmetic (*) "*"
+compilePrimitiveExpr Div = arithmetic (/) "/"
+compilePrimitiveExpr Eql = comparison (==) "=="
+compilePrimitiveExpr Neq = comparison (/=) "!="
+compilePrimitiveExpr LTh = comparison (<)  "<"
+compilePrimitiveExpr LEq = comparison (<=) "<="
+compilePrimitiveExpr GTh = comparison (>)  ">"
+compilePrimitiveExpr GEq = comparison (>=) ">="
+compilePrimitiveExpr Exp = unary exp "exp"
+compilePrimitiveExpr Log = unary log "log"
+compilePrimitiveExpr Sin = unary sin "sin"
+compilePrimitiveExpr Cos = unary cos "cos"
+compilePrimitiveExpr Tan = unary tan "tan"
+compilePrimitiveExpr Asin = unary asin "asin"
+compilePrimitiveExpr Acos = unary acos "acos"
+compilePrimitiveExpr Atan = unary atan "atan"
+compilePrimitiveExpr Sinh = unary sinh "sinh"
+compilePrimitiveExpr Cosh = unary cosh "cosh"
+compilePrimitiveExpr Tanh = unary tanh "tanh"
+compilePrimitiveExpr Sqrt = unary sqrt "sqrt"
+compilePrimitiveExpr Pow  = pow
+compilePrimitiveExpr RealPrim = realPrim
+compilePrimitiveExpr IfProc = ifProc
 
-pow :: AbstractValue -> Name -> CExpr
-pow (AbstractPair (AbstractScalar (Real r1))
-                  (AbstractScalar (Real r2))) _
-    = CDoubleLit (r1 ** r2)
-pow v x = CFunCall "pow" [car v x, cdr v x]
+car :: AbstractValue -> Name -> CG CExpr
+car (AbstractPair v@(AbstractScalar _) _) _ = return $ valueOf v
+car _                                     x = return $ CSlotAccess (CVar x) "a"
 
-unary :: (Float -> Float) -> Name -> AbstractValue -> Name -> CExpr
-unary fun fun_name (AbstractScalar (Real r)) _
-    = CDoubleLit (fun r)
-unary _ fun_name _ x = CFunCall fun_name [CVar x]
+cdr :: AbstractValue -> Name -> CG CExpr
+cdr (AbstractPair _ v@(AbstractScalar _)) _ = return $ valueOf v
+cdr _                                     x = return $ CSlotAccess (CVar x) "d"
 
 arithmetic :: (Float -> Float -> Float)
            -> Name
            -> AbstractValue
            -> Name
-           -> CExpr
+           -> CG CExpr
 arithmetic op op_name (AbstractPair (AbstractScalar (Real r1))
                                     (AbstractScalar (Real r2))) _
-    = CDoubleLit (r1 `op` r2)
+    = return $ CDoubleLit (r1 `op` r2)
 arithmetic op op_name v x
-    = CBinaryOp op_name (car v x) (cdr v x)
+    = liftM2 (CBinaryOp op_name) (car v x) (cdr v x)
 
 comparison :: (Float -> Float -> Bool)
            -> Name
            -> AbstractValue
            -> Name
-           -> CExpr
+           -> CG CExpr
 comparison op op_name (AbstractPair (AbstractScalar (Real r1))
                                     (AbstractScalar (Real r2))) _
-    = CIntLit . bool2int $ r1 `op` r2
+    = return . CIntLit . bool2int $ r1 `op` r2
     where
       bool2int True  = 1
       bool2int False = 0
-comparison op op_name v x
-    = CBinaryOp op_name (car v x) (cdr v x)
+comparison _ op_name v x
+    = liftM2 (CBinaryOp op_name) (car v x) (cdr v x)
 
-realPrim :: AbstractValue -> Name -> CExpr
-realPrim (AbstractScalar (Real r)) _ = CDoubleLit r
-realPrim _ x = CVar x
+unary :: (Float -> Float) -> Name -> AbstractValue -> Name -> CG CExpr
+unary fun fun_name (AbstractScalar (Real r)) _
+    = return $ CDoubleLit (fun r)
+unary _ fun_name _ x = return $ CFunCall fun_name [CVar x]
 
--- The following implementation is wrong.  What we actually need to do
--- is this: enumerate all thunks appearing in the analysis  (i.e., all
--- abstract closures in which the formal parameter does not occur free
--- in the body), and for each thunk generate a function that takes one
--- argument, that thunk, and whose body is the body of the thunk
--- compiled in the environment of the thunk.
-ifProc :: (Name -> Name)
-       -> (AbstractValue -> CType)
-       -> (AbstractValue -> Name)
-       -> ((AbstractValue, AbstractValue) -> Name)
-       -> AbstractAnalysis
-       -> AbstractValue -> Name -> CExpr
-ifProc xFun tFun mFun fFun a
-           (AbstractPair (AbstractScalar (Boolean True))
-                     (AbstractPair v@(AbstractClosure env x e) _)) _
-    = force xFun mFun fFun a v
-ifProc xFun tFun mFun fFun a
-           (AbstractPair (AbstractScalar (Boolean False))
-                     (AbstractPair _ v@(AbstractClosure env x e))) _
-    = force xFun mFun fFun a v
-ifProc xFun tFun mFun fFun a
-           (AbstractPair AbstractBoolean (AbstractPair v1 v2)) x
-    = CTernaryCond c t e
+pow :: AbstractValue -> Name -> CG CExpr
+pow (AbstractPair (AbstractScalar (Real r1))
+                  (AbstractScalar (Real r2))) _
+    = return $ CDoubleLit (r1 ** r2)
+pow v x = (CFunCall "pow") <$> sequence [car v x, cdr v x]
+
+realPrim :: AbstractValue -> Name -> CG CExpr
+realPrim (AbstractScalar (Real r)) _ = return $ CDoubleLit r
+realPrim _                         x = return $ CVar x
+
+ifProc :: AbstractValue -> Name -> CG CExpr
+ifProc (AbstractPair (AbstractScalar (Boolean True))
+                     (AbstractPair thunk _)) x
+    = do thk_name <- getThkName thunk
+         return $ CFunCall thk_name [cdar x]
+ifProc (AbstractPair (AbstractScalar (Boolean False))
+                     (AbstractPair _ thunk)) x
+    = do thk_name <- getThkName thunk
+         return $ CFunCall thk_name [cddr x]
+ifProc (AbstractPair AbstractBoolean
+                     (AbstractPair thunk1 thunk2)) x
+    = do thk_name1 <- getThkName thunk1
+         thk_name2 <- getThkName thunk2
+         return $ CTernaryCond (CSlotAccess (CVar x) "a")
+                    (CFunCall thk_name1 [cdar x])
+                    (CFunCall thk_name2 [cddr x])
+
+cdar :: Name -> CExpr
+cdar x = CSlotAccess (CSlotAccess (CVar x) "d") "a"
+
+cddr :: Name -> CExpr
+cddr x = CSlotAccess (CSlotAccess (CVar x) "d") "d"
+
+-- Compile thunks
+type Thunk = (AbstractEnvironment, Name, CoreExpr)
+
+compileThunk :: Thunk -> CG (CDecl, CDecl)
+compileThunk (env, x, e)
+    = do ret_type <- typeOf =<< (refineEval e env <$> analysis)
+         fun_name <- getThkName thunk
+         thk_type <- typeOf thunk
+         let formals = [(thk_type, "c")]
+         ret_stat <- CReturn <$> genCExpr e env (Environment.domain env)
+         let proto = CFunProto ret_type fun_name formals
+         return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
-      c = CSlotAccess (CVar x) "a"
-      t = force xFun mFun fFun a v1
-      e = force xFun mFun fFun a v2
+      thunk = AbstractClosure env x e
 
-force xFun mFun fFun a (AbstractClosure env x e)
-    = genCExpr xFun mFun fFun a env [] e
-force xFun mFun fFun a v
-    = error $ "force: the argument is not a thunk: " ++ show v
+enumThunks :: CG [Thunk]
+enumThunks
+    = do a <- analysis
+         return $ nub [ (env, x, e)
+                      | ((Lam x e, _), AbstractClosure env _ _) <- Analysis.toList a
+                      , not (x `Set.member` freeVariables e)
+                      ]
+
+compileThunks :: CG [(CDecl, CDecl)]
+compileThunks = enumThunks >>= mapM compileThunk
+
+-- Compile main function
+compileMain :: CoreExpr -> AbstractEnvironment -> CG CDecl
+compileMain expression environment
+    = do res      <- Analysis.lookup expression environment <$> analysis
+         res_type <- typeOf res
+         res_expr <- genCExpr expression environment []
+         let proto = CFunProto CInt "main" []
+             body  = [ CLocalVarDecl res_type "result" res_expr
+                     , CReturn (CIntLit 0)
+                     ]
+         return $ CFunDecl proto body
 
 genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
-genCProg program@(expression, constants)
-    = structDecls ++ funProtos ++ primProtos ++ globals ++ [entryPoint] ++ funDecls ++ primDecls
+genCProg program@(expression, initialEnvironment)
+    = runCG code analysis
     where
-      analysis = analyze program
-      values   = nub (Analysis.values analysis)
+      environment = abstractEnvironment initialEnvironment
+      analysis    = analyze program
+      values      = nub (Analysis.values analysis)
+      code        = do structs <- concatMapM genCStructDecl values
+                       globals <- sequence [ genCGlobalVarDecl x v
+                                           | (x, v) <- Environment.bindings environment
+                                           ]
+                       closures <- compileClosureApplications
+                       primitives <- compilePrimitiveApplications
+                       thunks <- compileThunks
+                       entry <- compileMain expression environment
+                       let (closure_protos, closure_defns) = unzip closures
+                           (primitive_protos, primitive_defns) = unzip primitives
+                           (thunk_protos, thunk_defns) = unzip thunks
+                           protos = closure_protos ++ primitive_protos ++ thunk_protos
+                           defns = closure_defns ++ primitive_defns ++ thunk_defns
+                       return $ structs ++ globals ++ protos ++ [entry] ++ defns
 
-      -- Build lookup tables and lookup functions for relevant data
-      xTbl = Map.fromList [(n, zencode n) | n <- Set.toList (variables expression)]
-      xFun = mkLookupFun xTbl   -- X from the paper
-      sTbl = mkLookupTbl "#:val-" values
-      sFun = mkLookupFun sTbl   -- S from the paper
-      fTbl = mkLookupTbl "#:fun-" [ (v1, v2) | v1 <- values, v2 <- values ]
-      fFun = mkLookupFun fTbl   -- F from the paper
-      tTbl = Map.fromList [(v, genCType sFun xFun v) | v <- values ]
-      tFun = mkLookupFun tTbl   -- T from the paper
-      mTbl = mkLookupTbl "#:con-" values
-      mFun = mkLookupFun mTbl   -- M from the paper
-
-      closureValuePairs
-          = nub [ (env', x, b, v)
-                | (App l@(Lam x b) e, env) <- Analysis.domain analysis
-                , let env' = Environment.restrict (freeVariables l) env
-                      v    = Analysis.lookup e env analysis
-                ]
-      primValuePairs
-          = nub [ (p, v)
-                | (App (Var f) e, env) <- Analysis.domain analysis
-                , AbstractScalar (Primitive p) <- [Environment.lookup f env]
-                , let v = Analysis.lookup e env analysis
-                ]
-
-      structDecls
-          = concatMap (genCStructDecl tFun mFun) values
-      (funProtos, funDecls)
-          = unzip [ genFunDecl xFun tFun mFun fFun analysis v env x e
-                  | (env, x, e, v) <- closureValuePairs
-                  ]
-      (primProtos, primDecls)
-          = unzip [ genPrimDecl xFun tFun mFun fFun analysis v p
-                  | (p, v) <- primValuePairs
-                  ]
-      entryPoint
-          = CFunDecl (CFunProto CInt "main" [])
-            [ CLocalVarDecl (tFun result) "result" (genCExpr xFun mFun fFun analysis environment [] expression)
-            , CReturn (CIntLit 0)
-            ]
-      globals
-          = [ genCGlobalVarDecl tFun (zencode x) v
-            | (x, v) <- Environment.bindings . Environment.restrict (freeVariables expression) $ environment
-            ]
-      environment = initialAbstractEnvironment constants
-      result      = Analysis.lookup expression environment analysis
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f = liftM concat . sequence . map f
