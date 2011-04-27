@@ -43,6 +43,7 @@ data Table = Table { strName :: Map AbstractValue (Name, Int)
                    , counter :: Int
                    }
 
+-- Code generation monad
 type CG = ReaderT AbstractAnalysis (State Table)
 
 runCG :: CG a -> AbstractAnalysis -> a
@@ -137,8 +138,8 @@ typeOf u@(AbstractPair car cdr)
          return $ CStruct str_name members str_index
 typeOf AbstractBottom = error "typeOf: AbstractBottom"
 
-genCStructDecl :: AbstractValue -> CG [(CDecl, CDecl)]
-genCStructDecl v
+compileStructDecl :: AbstractValue -> CG [(CDecl, CDecl)]
+compileStructDecl v
     = do typ <- typeOf v
          case typ of
            CStruct str_name members str_index ->
@@ -160,37 +161,37 @@ valueOf (AbstractScalar s) = case s of
                                Primitive _   -> CStructCon []
 valueOf _ = error "valueOf: non-solved abstract value"
 
-genCGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
-genCGlobalVarDecl x v
+compileGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
+compileGlobalVarDecl x v
     = do typ <- typeOf v
          return $ CGlobalVarDecl typ (zencode x) (valueOf v)
 
-genCExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
-genCExpr (Var x) env fvs
+compileExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
+compileExpr (Var x) env fvs
     | x `elem` fvs
     = return $ CSlotAccess (CVar "c") (zencode x)
     | otherwise
     = return $ CVar (zencode x)
-genCExpr e@(Lam _ _) env fvs
+compileExpr e@(Lam _ _) env fvs
     = do closure@(AbstractClosure closure_env _ _) <- Analysis.lookup e env <$> analysis
          fun_name <- getConName closure
-         args <- sequence [genCExpr (Var x) env fvs | x <- Environment.domain closure_env]
+         args <- sequence [compileExpr (Var x) env fvs | x <- Environment.domain closure_env]
          return $ CFunCall fun_name args
-genCExpr (App e1 e2) env fvs
+compileExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis
          fun_name <- getAppName v1 v2
-         c1 <- genCExpr e1 env fvs
-         c2 <- genCExpr e2 env fvs
+         c1 <- compileExpr e1 env fvs
+         c2 <- compileExpr e2 env fvs
          return $ CFunCall fun_name [c1, c2]
-genCExpr e@(Pair e1 e2) env fvs
+compileExpr e@(Pair e1 e2) env fvs
     = do pair <- Analysis.lookup e env <$> analysis
          fun_name <- getConName pair
-         c1 <- genCExpr e1 env fvs
-         c2 <- genCExpr e2 env fvs
+         c1 <- compileExpr e1 env fvs
+         c2 <- compileExpr e2 env fvs
          return $ CFunCall fun_name [c1, c2]
-genCExpr (Letrec bindings body) env fvs
-    = error "genCExpr: LETREC is not supported yet"
+compileExpr (Letrec bindings body) env fvs
+    = compileExpr (pushLetrec bindings body) env fvs
 
 -- Closure applications
 type ClosureValuePair = (AbstractEnvironment, Name, CoreExpr, AbstractValue)
@@ -202,7 +203,7 @@ compileClosureApplication (env, x, e, v)
          formals  <- sequence [ liftM2 (,) (typeOf val) (return var)
                               | (val, var) <- [(closure, "c"), (v, zencode x)]
                               ]
-         ret_stat <- CReturn <$> genCExpr e (Environment.insert x v env) (Environment.domain env)
+         ret_stat <- CReturn <$> compileExpr e (Environment.insert x v env) (Environment.domain env)
          let proto = CFunProto ret_type fun_name formals
          return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
@@ -212,10 +213,10 @@ enumClosureValuePairs :: CG [ClosureValuePair]
 enumClosureValuePairs
     = do a <- analysis
          return $ nub [ (closure_env, closure_formal, closure_body, operand_value)
-                      | (App operator operand, env) <- Analysis.domain a
-                      , (AbstractClosure closure_env closure_formal closure_body)
-                          <- [Analysis.lookup operator env a]
-                      , let operand_value = Analysis.lookup operand  env a
+                      | operator_value@(AbstractClosure closure_env closure_formal closure_body)
+                          <- Analysis.values a
+                      , operand_value <- Analysis.values a
+                      , refineApply operator_value operand_value a /= AbstractBottom
                       ]
 
 compileClosureApplications :: CG [(CDecl, CDecl)]
@@ -241,10 +242,9 @@ enumPrimitiveValuePairs :: CG [PrimitiveValuePair]
 enumPrimitiveValuePairs
     = do a <- analysis
          return $ nub [ (primitive, operand_value)
-                      | (App (Var p) operand, env) <- Analysis.domain a
-                      , AbstractScalar (Primitive primitive) <- [Environment.lookup p env]
-                      , let operand_value
-                              = Analysis.lookup operand  env a
+                      | (App operator operand, env) <- Analysis.domain a
+                      , AbstractScalar (Primitive primitive) <- [Analysis.lookup operator env a]
+                      , let operand_value = Analysis.lookup operand  env a
                       ]
 
 compilePrimitiveApplications :: CG [(CDecl, CDecl)]
@@ -359,7 +359,7 @@ compileThunk (env, x, e)
          fun_name <- getThkName thunk
          thk_type <- typeOf thunk
          let formals = [(thk_type, "c")]
-         ret_stat <- CReturn <$> genCExpr e env (Environment.domain env)
+         ret_stat <- CReturn <$> compileExpr e env (Environment.domain env)
          let proto = CFunProto ret_type fun_name formals
          return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
@@ -382,7 +382,7 @@ compileMain :: CoreExpr -> AbstractEnvironment -> CG CDecl
 compileMain expression environment
     = do res      <- Analysis.lookup expression environment <$> analysis
          res_type <- typeOf res
-         res_expr <- genCExpr expression environment []
+         res_expr <- compileExpr expression environment []
          let proto = CFunProto CInt "main" []
              body  = [ CLocalVarDecl res_type "result" res_expr
                      , CReturn (CIntLit 0)
@@ -396,8 +396,8 @@ genCProg program@(expression, initialEnvironment)
       environment = abstractEnvironment initialEnvironment
       analysis    = analyze program
       values      = nub (Analysis.values analysis)
-      code        = do structs <- concatMapM genCStructDecl values
-                       globals <- sequence [ genCGlobalVarDecl x v
+      code        = do structs <- concatMapM compileStructDecl values
+                       globals <- sequence [ compileGlobalVarDecl x v
                                            | (x, v) <- Environment.bindings environment
                                            ]
                        closures <- compileClosureApplications
