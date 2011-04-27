@@ -117,3 +117,9 @@ forcing a thunk =(\dummy -> e, env)= is equivalent to evaluating the
 body =e= of the thunk in the environment =env= of the thunk.  I have
 chosen the latter approach for both the concrete and abstract
 evaluator, however it seems to present problems in the code generator.
+
+Changing the enumeration of thunks helps.  Indeed, we don't have to
+(and can't) compile /all/ thunks, we only have to consider those being
+actually forced (refined) during the flow analysis.  Thus we filter
+out the thunks for which 'refineThunk' yields bottom.  This seems to
+fix the problem with non-matching patterns in 'genCExpr'.
