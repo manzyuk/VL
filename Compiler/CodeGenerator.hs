@@ -10,12 +10,13 @@ import VL.Language.Read
 import VL.Language.Pretty
 
 import VL.Abstract.Value
-import VL.Abstract.Evaluator hiding (arithmetic, comparison, unary)
+import VL.Abstract.Evaluator
 
 import VL.Abstract.Analysis (AbstractAnalysis)
 import qualified VL.Abstract.Analysis as Analysis
 
 import VL.Compiler.C
+import VL.Compiler.Monad
 import VL.Compiler.ZEncoding
 
 import Prelude hiding (read)
@@ -23,75 +24,10 @@ import Prelude hiding (read)
 import Data.Ord
 import Data.List
 
-import Data.Map (Map)
-import qualified Data.Map as Map
-
 import qualified Data.Set as Set
 
 import Control.Monad
-import Control.Monad.State
-import Control.Monad.Reader
-
 import Control.Applicative
-
-import Debug.Trace
-
-data Table = Table { strName :: Map AbstractValue (Name, Int)
-                   , conName :: Map AbstractValue Name
-                   , appName :: Map (AbstractValue, AbstractValue) Name
-                   , counter :: Int
-                   }
-
--- Code generation monad
-type CG = ReaderT AbstractAnalysis (State Table)
-
-runCG :: CG a -> AbstractAnalysis -> a
-runCG = (flip evalState emptyTable .). runReaderT
-    where
-      emptyTable = Table { strName = Map.empty
-                         , conName = Map.empty
-                         , appName = Map.empty
-                         , counter = 0
-                         }
-
-analysis :: CG AbstractAnalysis
-analysis = ask
-
-getStrNameAndIndex :: AbstractValue -> CG (Name, Int)
-getStrNameAndIndex v
-    = do table <- get
-         case Map.lookup v (strName table) of
-           Just (n, i) -> return (n, i)
-           Nothing     -> let i = counter table
-                              n = zencode $ "#:str-" ++ show i
-                          in do put table { strName = Map.insert v (n, i) (strName table)
-                                          , counter = succ i
-                                          }
-                                return (n, i)
-
-getConName :: AbstractValue -> CG Name
-getConName v
-    = do table <- get
-         case Map.lookup v (conName table) of
-           Just n  -> return n
-           Nothing -> let i = counter table
-                          n = zencode $ "#:con-" ++ show i
-                      in do put table { conName = Map.insert v n (conName table)
-                                      , counter = succ i
-                                      }
-                            return n
-
-getAppName :: AbstractValue -> AbstractValue -> CG Name
-getAppName v1 v2
-    = do table <- get
-         case Map.lookup (v1, v2) (appName table) of
-           Just n  -> return n
-           Nothing -> let i = counter table
-                          n = zencode $ "#:app-" ++ show i
-                      in do put table { appName = Map.insert (v1, v2) n (appName table)
-                                      , counter = succ i
-                                      }
-                            return n
 
 typeOf :: AbstractValue -> CG CType
 typeOf (AbstractScalar (Boolean _)) = return CInt
@@ -154,7 +90,7 @@ compileGlobalVarDecl x v
          return $ CGlobalVarDecl typ (zencode x) (valueOf v)
 
 compileExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
-compileExpr e@(Var x) env fvs
+compileExpr (Var x) env fvs
     | x `elem` fvs
     = return $ CSlotAccess (CVar "c") (zencode x)
     | otherwise
@@ -164,7 +100,7 @@ compileExpr e@(Lam _ _) env fvs
          fun_name <- getConName closure
          args <- sequence [compileExpr (Var x) env fvs | x <- Environment.domain closure_env]
          return $ CFunCall fun_name args
-compileExpr e@(App e1 e2) env fvs
+compileExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis
          fun_name <- getAppName v1 v2
@@ -196,18 +132,17 @@ compileClosureApplication (env, x, e, v)
     where
       closure = AbstractClosure env x e
 
-enumClosureValuePairs :: CG [ClosureValuePair]
-enumClosureValuePairs
-    = do a <- analysis
-         return $ nub [ (closure_env, closure_formal, closure_body, operand_value)
-                      | operator_value@(AbstractClosure closure_env closure_formal closure_body)
-                          <- Analysis.values a
-                      , operand_value <- Analysis.values a
-                      , refineApply operator_value operand_value a /= AbstractBottom
-                      ]
+enumClosureValuePairs :: AbstractAnalysis -> [ClosureValuePair]
+enumClosureValuePairs a
+    = nub [ (env, x, e, v)
+          | c@(AbstractClosure env x e) <- Analysis.values a
+          , v <- Analysis.values a
+          , refineApply c v a /= AbstractBottom
+          ]
 
 compileClosureApplications :: CG [(CDecl, CDecl)]
-compileClosureApplications = enumClosureValuePairs >>= mapM compileClosureApplication
+compileClosureApplications
+    = (enumClosureValuePairs <$> analysis) >>= mapM compileClosureApplication
 
 -- Primitive applications
 type PrimitiveValuePair = (Primitive, AbstractValue)
@@ -219,112 +154,112 @@ compilePrimitiveApplication (p, v)
          formals  <- sequence [ liftM2 (,) (typeOf val) (return var)
                               | (val, var) <- [(primitive, "dummy"), (v, "x")]
                               ]
-         ret_stat <- CReturn <$> compilePrimitiveExpr p v "x"
+         ret_stat <- CReturn <$> compilePrimitive p v (CVar "x")
          let proto = CFunProto ret_type fun_name formals
          return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
       primitive = AbstractScalar (Primitive p)
 
-enumPrimitiveValuePairs :: CG [PrimitiveValuePair]
-enumPrimitiveValuePairs
-    = do a <- analysis
-         return $ nub [ (primitive, operand_value)
-                      | (App operator operand, env) <- Analysis.domain a
-                      , AbstractScalar (Primitive primitive) <- [Analysis.lookup operator env a]
-                      , let operand_value = Analysis.lookup operand  env a
-                      ]
+enumPrimitiveValuePairs :: AbstractAnalysis -> [PrimitiveValuePair]
+enumPrimitiveValuePairs a
+    = nub [ (p, v)
+          | (App operator operand, env) <- Analysis.domain a
+          , AbstractScalar (Primitive p) <- [Analysis.lookup operator env a]
+          , let v = Analysis.lookup operand  env a
+          ]
 
 compilePrimitiveApplications :: CG [(CDecl, CDecl)]
-compilePrimitiveApplications = enumPrimitiveValuePairs >>= mapM compilePrimitiveApplication
+compilePrimitiveApplications
+    = (enumPrimitiveValuePairs <$> analysis) >>= mapM compilePrimitiveApplication
 
-compilePrimitiveExpr :: Primitive -> AbstractValue -> Name -> CG CExpr
-compilePrimitiveExpr Car = car
-compilePrimitiveExpr Cdr = cdr
-compilePrimitiveExpr Add = arithmetic (+) "+"
-compilePrimitiveExpr Sub = arithmetic (-) "-"
-compilePrimitiveExpr Mul = arithmetic (*) "*"
-compilePrimitiveExpr Div = arithmetic (/) "/"
-compilePrimitiveExpr Eql = comparison (==) "=="
-compilePrimitiveExpr Neq = comparison (/=) "!="
-compilePrimitiveExpr LTh = comparison (<)  "<"
-compilePrimitiveExpr LEq = comparison (<=) "<="
-compilePrimitiveExpr GTh = comparison (>)  ">"
-compilePrimitiveExpr GEq = comparison (>=) ">="
-compilePrimitiveExpr Exp = unary exp "exp"
-compilePrimitiveExpr Log = unary log "log"
-compilePrimitiveExpr Sin = unary sin "sin"
-compilePrimitiveExpr Cos = unary cos "cos"
-compilePrimitiveExpr Tan = unary tan "tan"
-compilePrimitiveExpr Asin = unary asin "asin"
-compilePrimitiveExpr Acos = unary acos "acos"
-compilePrimitiveExpr Atan = unary atan "atan"
-compilePrimitiveExpr Sinh = unary sinh "sinh"
-compilePrimitiveExpr Cosh = unary cosh "cosh"
-compilePrimitiveExpr Tanh = unary tanh "tanh"
-compilePrimitiveExpr Sqrt = unary sqrt "sqrt"
-compilePrimitiveExpr Pow  = pow
-compilePrimitiveExpr RealPrim = realPrim
-compilePrimitiveExpr IfProc = ifProc
+compilePrimitive :: Primitive -> AbstractValue -> CExpr -> CG CExpr
+compilePrimitive Car      = compileCar
+compilePrimitive Cdr      = compileCdr
+compilePrimitive Add      = compileArithmetic (+)  "+"
+compilePrimitive Sub      = compileArithmetic (-)  "-"
+compilePrimitive Mul      = compileArithmetic (*)  "*"
+compilePrimitive Div      = compileArithmetic (/)  "/"
+compilePrimitive Eql      = compileComparison (==) "=="
+compilePrimitive Neq      = compileComparison (/=) "!="
+compilePrimitive LTh      = compileComparison (<)  "<"
+compilePrimitive LEq      = compileComparison (<=) "<="
+compilePrimitive GTh      = compileComparison (>)  ">"
+compilePrimitive GEq      = compileComparison (>=) ">="
+compilePrimitive Exp      = compileUnary exp  "exp"
+compilePrimitive Log      = compileUnary log  "log"
+compilePrimitive Sin      = compileUnary sin  "sin"
+compilePrimitive Cos      = compileUnary cos  "cos"
+compilePrimitive Tan      = compileUnary tan  "tan"
+compilePrimitive Asin     = compileUnary asin "asin"
+compilePrimitive Acos     = compileUnary acos "acos"
+compilePrimitive Atan     = compileUnary atan "atan"
+compilePrimitive Sinh     = compileUnary sinh "sinh"
+compilePrimitive Cosh     = compileUnary cosh "cosh"
+compilePrimitive Tanh     = compileUnary tanh "tanh"
+compilePrimitive Sqrt     = compileUnary sqrt "sqrt"
+compilePrimitive Pow      = compilePow
+compilePrimitive IfProc   = compileIfProc
+compilePrimitive RealPrim = compileRealPrim
 
-car :: AbstractValue -> Name -> CG CExpr
-car (AbstractPair v@(AbstractScalar _) _) _ = return $ valueOf v
-car _                                     x = return $ CSlotAccess (CVar x) "a"
+compileCar :: AbstractValue -> CExpr -> CG CExpr
+compileCar (AbstractPair v@(AbstractScalar _) _) _ = return $ valueOf v
+compileCar _                                     x = return $ car x
 
-cdr :: AbstractValue -> Name -> CG CExpr
-cdr (AbstractPair _ v@(AbstractScalar _)) _ = return $ valueOf v
-cdr _                                     x = return $ CSlotAccess (CVar x) "d"
+compileCdr :: AbstractValue -> CExpr -> CG CExpr
+compileCdr (AbstractPair _ v@(AbstractScalar _)) _ = return $ valueOf v
+compileCdr _                                     x = return $ cdr x
 
-arithmetic :: (Float -> Float -> Float)
-           -> Name
-           -> AbstractValue
-           -> Name
-           -> CG CExpr
-arithmetic op op_name (AbstractPair (AbstractScalar (Real r1))
-                                    (AbstractScalar (Real r2))) _
+compileArithmetic :: (Float -> Float -> Float)
+                  -> Name
+                  -> AbstractValue
+                  -> CExpr
+                  -> CG CExpr
+compileArithmetic op op_name (AbstractPair (AbstractScalar (Real r1))
+                                           (AbstractScalar (Real r2))) _
     = return $ CDoubleLit (r1 `op` r2)
-arithmetic op op_name v x
-    = liftM2 (CBinaryOp op_name) (car v x) (cdr v x)
+compileArithmetic op op_name v x
+    = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
 
-comparison :: (Float -> Float -> Bool)
-           -> Name
-           -> AbstractValue
-           -> Name
-           -> CG CExpr
-comparison op op_name (AbstractPair (AbstractScalar (Real r1))
-                                    (AbstractScalar (Real r2))) _
+compileComparison :: (Float -> Float -> Bool)
+                  -> Name
+                  -> AbstractValue
+                  -> CExpr
+                  -> CG CExpr
+compileComparison op op_name (AbstractPair (AbstractScalar (Real r1))
+                                           (AbstractScalar (Real r2))) _
     = return . CIntLit . bool2int $ r1 `op` r2
     where
       bool2int True  = 1
       bool2int False = 0
-comparison _ op_name v x
-    = liftM2 (CBinaryOp op_name) (car v x) (cdr v x)
+compileComparison _ op_name v x
+    = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
 
-unary :: (Float -> Float) -> Name -> AbstractValue -> Name -> CG CExpr
-unary fun fun_name (AbstractScalar (Real r)) _
+compileUnary :: (Float -> Float)
+             -> Name
+             -> AbstractValue
+             -> CExpr
+             -> CG CExpr
+compileUnary fun fun_name (AbstractScalar (Real r)) _
     = return $ CDoubleLit (fun r)
-unary _ fun_name _ x = return $ CFunCall fun_name [CVar x]
+compileUnary _ fun_name _ x = return $ CFunCall fun_name [x]
 
-pow :: AbstractValue -> Name -> CG CExpr
-pow (AbstractPair (AbstractScalar (Real r1))
+compilePow :: AbstractValue -> CExpr -> CG CExpr
+compilePow (AbstractPair (AbstractScalar (Real r1))
                   (AbstractScalar (Real r2))) _
     = return $ CDoubleLit (r1 ** r2)
-pow v x = (CFunCall "pow") <$> sequence [car v x, cdr v x]
+compilePow v x = (CFunCall "pow") <$> sequence [compileCar v x, compileCdr v x]
 
-realPrim :: AbstractValue -> Name -> CG CExpr
-realPrim (AbstractScalar (Real r)) _ = return $ CDoubleLit r
-realPrim _                         x = return $ CVar x
-
-ifProc :: AbstractValue -> Name -> CG CExpr
-ifProc (AbstractPair (AbstractScalar (Boolean True))
-                     (AbstractPair thunk _)) x
-    = compileIfBranch thunk (cdar x)
-ifProc (AbstractPair (AbstractScalar (Boolean False))
-                     (AbstractPair _ thunk)) x
+compileIfProc :: AbstractValue -> CExpr -> CG CExpr
+compileIfProc (AbstractPair (AbstractScalar (Boolean True))
+                            (AbstractPair thunk _)) x
+    = compileIfBranch thunk (cadr x)
+compileIfProc (AbstractPair (AbstractScalar (Boolean False))
+                            (AbstractPair _ thunk)) x
     = compileIfBranch thunk (cddr x)
-ifProc (AbstractPair AbstractBoolean
-                     (AbstractPair thunk1 thunk2)) x
-    = liftM2 (CTernaryCond (CSlotAccess (CVar x) "a"))
-             (compileIfBranch thunk1 (cdar x))
+compileIfProc (AbstractPair AbstractBoolean
+                            (AbstractPair thunk1 thunk2)) x
+    = liftM2 (CTernaryCond (car x))
+             (compileIfBranch thunk1 (cadr x))
              (compileIfBranch thunk2 (cddr x))
 
 compileIfBranch :: AbstractValue -> CExpr -> CG CExpr
@@ -333,11 +268,15 @@ compileIfBranch thunk expr
          con_name <- getConName (AbstractScalar Nil)
          return $ CFunCall fun_name [expr, CFunCall con_name []]
 
-cdar :: Name -> CExpr
-cdar x = CSlotAccess (CSlotAccess (CVar x) "d") "a"
+compileRealPrim :: AbstractValue -> CExpr -> CG CExpr
+compileRealPrim (AbstractScalar (Real r)) _ = return $ CDoubleLit r
+compileRealPrim _                         x = return x
 
-cddr :: Name -> CExpr
-cddr x = CSlotAccess (CSlotAccess (CVar x) "d") "d"
+car, cdr, cadr, cddr :: CExpr -> CExpr
+car x = CSlotAccess x "a"
+cdr x = CSlotAccess x "d"
+cadr  = car . cdr
+cddr  = cdr . cdr
 
 -- Compile main function
 compileMain :: CoreExpr -> AbstractEnvironment -> CG CDecl
@@ -347,6 +286,11 @@ compileMain expression environment
          res_expr <- compileExpr expression environment []
          let proto = CFunProto CInt "main" []
              body  = [ CLocalVarDecl res_type "result" res_expr
+                     -- If possible, print the result to the stdout.
+                     , case res_type of
+                         CInt    -> CPrintf "%d\\n" [CVar "result"]
+                         CDouble -> CPrintf "%f\\n" [CVar "result"]
+                         _       -> CPrintf "Can't display structs" []
                      , CReturn (CIntLit 0)
                      ]
          return $ CFunDecl proto body
@@ -358,22 +302,31 @@ compileProg program@(expression, initialEnvironment)
       environment = abstractEnvironment initialEnvironment
       analysis    = analyze program
       values      = nub (Analysis.values analysis)
-      code        = do structs <- concatMapM compileStructDecl values
-                       globals <- sequence [ compileGlobalVarDecl x v
-                                           | (x, v) <- Environment.bindings environment
-                                           ]
-                       closures <- compileClosureApplications
-
+      code        = do structs    <- concatMapM compileStructDecl values
+                       globals    <- sequence [ compileGlobalVarDecl x v
+                                              | (x, v) <- Environment.bindings environment
+                                              ]
+                       closures   <- compileClosureApplications
                        primitives <- compilePrimitiveApplications
-                       entry <- compileMain expression environment
-                       let (struct_decls, struct_cons) = unzip structs
-                           (closure_protos, closure_defns) = unzip closures
+                       entryPoint <- compileMain expression environment
+                       let (struct_decls,     struct_cons    ) = unzip structs
+                           (closure_protos,   closure_defns  ) = unzip closures
                            (primitive_protos, primitive_defns) = unzip primitives
-                           protos = closure_protos ++ primitive_protos
-                           defns = closure_defns ++ primitive_defns
-                       return $ sortBy (comparing strIndex)  struct_decls
-                                  ++ struct_cons ++ globals ++ protos ++ [entry] ++ defns
+                           include = CInclude "<stdio.h>"
+                           protos  = closure_protos ++ primitive_protos
+                           defns   = closure_defns  ++ primitive_defns
+                           decls   = concat [ sortBy (comparing strIndex)  struct_decls
+                                            , struct_cons
+                                            , globals
+                                            , protos
+                                            , [entryPoint]
+                                            , defns
+                                            ]
+                       return $ include : decls
       strIndex (CStructDecl _ _ i) = i
 
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = liftM concat . sequence . map f
+
+compile :: String -> String
+compile = emitProg . compileProg . read
