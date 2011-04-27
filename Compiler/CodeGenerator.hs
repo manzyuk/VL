@@ -363,8 +363,9 @@ enumThunks :: CG [Thunk]
 enumThunks
     = do a <- analysis
          return $ nub [ (env, x, e)
-                      | ((Lam x e, _), AbstractClosure env _ _) <- Analysis.toList a
+                      | ((Lam x e, _), thunk@(AbstractClosure env _ _)) <- Analysis.toList a
                       , not (x `Set.member` freeVariables e)
+                      , refineThunk thunk a /= AbstractBottom
                       ]
 
 compileThunks :: CG [(CDecl, CDecl)]
