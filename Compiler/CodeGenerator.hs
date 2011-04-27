@@ -117,6 +117,12 @@ typeOf u@(AbstractScalar (Primitive _))
 typeOf u@(AbstractScalar Nil)
     = do (str_name, str_index) <- getStrNameAndIndex u
          return $ CStruct str_name [] str_index
+-- NOTE:  It is important that 'getStrNameAndIndex' below is called
+-- /after/ determining the types of the struct members.  This ensures
+-- that the index of a struct is always greater than the indexes of
+-- the structs it depends upon.  This allows us to achieve the result
+-- of topological ordering of the structs by merely sorting them by
+-- their indexes.
 typeOf u@(AbstractClosure env _ _)
     = do members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
                               | (x, v) <- Environment.bindings env
