@@ -182,9 +182,8 @@ refineIfProc _ v
     = error $ "refineIfProc: the argument is not a boolean: " ++ show v
 
 refineThunk :: AbstractValue -> AbstractAnalysis -> AbstractValue
-refineThunk (AbstractClosure env x e) a
-    -- We assume that x does not occur in e
-    = refineEval e env a
+refineThunk thunk@(AbstractClosure _ _ _) a
+    = refineApply thunk (AbstractScalar Nil) a
 refineThunk v _
     = error $ "refineThunk: the argument is not a thunk: " ++ show v
 
@@ -270,9 +269,8 @@ expandIfProc v _
     = error $ "expandIfProc: the argument is not a boolean: " ++ show v
 
 expandThunk :: AbstractValue -> AbstractAnalysis -> AbstractAnalysis
-expandThunk (AbstractClosure env x e) a
-    -- We assume that x does not occur in e
-    = Analysis.expand e env a
+expandThunk thunk@(AbstractClosure _ _ _) a
+    = expandApply thunk (AbstractScalar Nil) a
 expandThunk v _
     = error $ "expandThunk: the argument is not a thunk: " ++ show v
 
