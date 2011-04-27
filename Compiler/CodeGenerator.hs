@@ -394,8 +394,8 @@ compileMain expression environment
                      ]
          return $ CFunDecl proto body
 
-genCProg :: (CoreExpr, ScalarEnvironment) -> CProg
-genCProg program@(expression, initialEnvironment)
+compileProg :: (CoreExpr, ScalarEnvironment) -> CProg
+compileProg program@(expression, initialEnvironment)
     = runCG code analysis
     where
       environment = abstractEnvironment initialEnvironment
