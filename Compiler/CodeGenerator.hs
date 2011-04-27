@@ -214,8 +214,8 @@ compileArithmetic :: (Float -> Float -> Float)
                   -> AbstractValue
                   -> CExpr
                   -> CG CExpr
-compileArithmetic op op_name (AbstractPair (AbstractScalar (Real r1))
-                                           (AbstractScalar (Real r2))) _
+compileArithmetic op _ (AbstractPair (AbstractScalar (Real r1))
+                                     (AbstractScalar (Real r2))) _
     = return $ CDoubleLit (r1 `op` r2)
 compileArithmetic op op_name v x
     = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
@@ -225,8 +225,8 @@ compileComparison :: (Float -> Float -> Bool)
                   -> AbstractValue
                   -> CExpr
                   -> CG CExpr
-compileComparison op op_name (AbstractPair (AbstractScalar (Real r1))
-                                           (AbstractScalar (Real r2))) _
+compileComparison op _ (AbstractPair (AbstractScalar (Real r1))
+                                     (AbstractScalar (Real r2))) _
     = return . CIntLit . bool2int $ r1 `op` r2
     where
       bool2int True  = 1
@@ -239,7 +239,7 @@ compileUnary :: (Float -> Float)
              -> AbstractValue
              -> CExpr
              -> CG CExpr
-compileUnary fun fun_name (AbstractScalar (Real r)) _
+compileUnary fun _ (AbstractScalar (Real r)) _
     = return $ CDoubleLit (fun r)
 compileUnary _ fun_name _ x = return $ CFunCall fun_name [x]
 
