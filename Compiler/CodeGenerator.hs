@@ -153,12 +153,13 @@ compileStructDecl v
            _ -> return []
 
 valueOf :: AbstractValue -> CExpr
-valueOf (AbstractScalar s) = case s of
-                               Nil           -> CStructCon []
-                               Boolean True  -> CIntLit 1
-                               Boolean False -> CIntLit 0
-                               Real r        -> CDoubleLit r
-                               Primitive _   -> CStructCon []
+valueOf (AbstractScalar s)
+    = case s of
+        Nil           -> CStructCon []
+        Boolean True  -> CIntLit 1
+        Boolean False -> CIntLit 0
+        Real r        -> CDoubleLit r
+        Primitive _   -> CStructCon []
 valueOf _ = error "valueOf: non-solved abstract value"
 
 compileGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
@@ -167,7 +168,7 @@ compileGlobalVarDecl x v
          return $ CGlobalVarDecl typ (zencode x) (valueOf v)
 
 compileExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
-compileExpr (Var x) env fvs
+compileExpr e@(Var x) env fvs
     | x `elem` fvs
     = return $ CSlotAccess (CVar "c") (zencode x)
     | otherwise
@@ -177,7 +178,7 @@ compileExpr e@(Lam _ _) env fvs
          fun_name <- getConName closure
          args <- sequence [compileExpr (Var x) env fvs | x <- Environment.domain closure_env]
          return $ CFunCall fun_name args
-compileExpr (App e1 e2) env fvs
+compileExpr e@(App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis
          fun_name <- getAppName v1 v2
@@ -365,13 +366,17 @@ compileThunk (env, x, e)
     where
       thunk = AbstractClosure env x e
 
+-- I don't know a better way to enumerate all thunks than to say that
+-- thunks are precisely the abstract value that we encounter during
+-- the compilation of IF-PROCEDURE.  These are precisely the keys of
+-- the 'thkName' table.  Having a writer monad inside CG would be
+-- cleaner, but at this point I want something working, not something
+-- necessarily pretty.
 enumThunks :: CG [Thunk]
 enumThunks
-    = do a <- analysis
+    = do table <- get
          return $ nub [ (env, x, e)
-                      | ((Lam x e, _), thunk@(AbstractClosure env _ _)) <- Analysis.toList a
-                      , not (x `Set.member` freeVariables e)
-                      , refineThunk thunk a /= AbstractBottom
+                      | AbstractClosure env x e <- Map.keys (thkName table)
                       ]
 
 compileThunks :: CG [(CDecl, CDecl)]
@@ -401,7 +406,10 @@ genCProg program@(expression, initialEnvironment)
                                            | (x, v) <- Environment.bindings environment
                                            ]
                        closures <- compileClosureApplications
+
                        primitives <- compilePrimitiveApplications
+                       -- It is important that thunks are compiled after primitives because
+                       -- primitives introduce calls to functions corresponding to thunks.
                        thunks <- compileThunks
                        entry <- compileMain expression environment
                        let (struct_decls, struct_cons) = unzip structs
