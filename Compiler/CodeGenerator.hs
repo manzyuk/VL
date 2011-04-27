@@ -206,11 +206,10 @@ enumClosureValuePairs :: CG [ClosureValuePair]
 enumClosureValuePairs
     = do a <- analysis
          return $ nub [ (closure_env, closure_formal, closure_body, operand_value)
-                      | (App operator@(Lam _ _) operand, env) <- Analysis.domain a
-                      , let (AbstractClosure closure_env closure_formal closure_body)
-                              = Analysis.lookup operator env a
-                            operand_value
-                              = Analysis.lookup operand  env a
+                      | (App operator operand, env) <- Analysis.domain a
+                      , (AbstractClosure closure_env closure_formal closure_body)
+                          <- [Analysis.lookup operator env a]
+                      , let operand_value = Analysis.lookup operand  env a
                       ]
 
 compileClosureApplications :: CG [(CDecl, CDecl)]
@@ -405,9 +404,9 @@ genCProg program@(expression, initialEnvironment)
                            (thunk_protos, thunk_defns) = unzip thunks
                            protos = closure_protos ++ primitive_protos ++ thunk_protos
                            defns = closure_defns ++ primitive_defns ++ thunk_defns
-                       return $ sortBy (comparing structNum)  struct_decls
+                       return $ sortBy (comparing strIndex)  struct_decls
                                   ++ struct_cons ++ globals ++ protos ++ [entry] ++ defns
-      structNum (CStructDecl _ _ i) = i
+      strIndex (CStructDecl _ _ i) = i
 
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = liftM concat . sequence . map f
