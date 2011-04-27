@@ -1,4 +1,4 @@
-.PHONY: test clean
+.PHONY: test clean vl2c
 test:
 	ghc --make -O2 -Wall  \
 		Test/Test.hs  \
@@ -7,8 +7,15 @@ test:
 		Abstract/*.hs \
 		Concrete/*.hs \
 	-threaded -o test && ./test
-
+vl2c:
+	ghc --make -O2 -Wall  \
+		Compiler/*.hs \
+		Language/*.hs \
+		Alacarte/*.hs \
+		Abstract/*.hs \
+		Concrete/*.hs \
+	-o vl2c
 clean:
-	rm -f test
+	rm -f test vl2c
 	find . -name "*.o"  -delete
 	find . -name "*.hi" -delete
