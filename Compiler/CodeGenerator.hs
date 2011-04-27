@@ -20,6 +20,7 @@ import VL.Compiler.ZEncoding
 
 import Prelude hiding (read)
 
+import Data.Ord
 import Data.List
 
 import Data.Map (Map)
@@ -35,7 +36,7 @@ import Control.Applicative
 
 import Debug.Trace
 
-data Table = Table { strName :: Map AbstractValue Name
+data Table = Table { strName :: Map AbstractValue (Name, Int)
                    , conName :: Map AbstractValue Name
                    , thkName :: Map AbstractValue Name
                    , appName :: Map (AbstractValue, AbstractValue) Name
@@ -57,17 +58,17 @@ runCG = (flip evalState emptyTable .). runReaderT
 analysis :: CG AbstractAnalysis
 analysis = ask
 
-getStrName :: AbstractValue -> CG Name
-getStrName v
+getStrNameAndIndex :: AbstractValue -> CG (Name, Int)
+getStrNameAndIndex v
     = do table <- get
          case Map.lookup v (strName table) of
-           Just n  -> return n
-           Nothing -> let i = counter table
-                          n = zencode $ "#:str-" ++ show i
-                      in do put table { strName = Map.insert v n (strName table)
-                                      , counter = succ i
-                                      }
-                            return n
+           Just (n, i) -> return (n, i)
+           Nothing     -> let i = counter table
+                              n = zencode $ "#:str-" ++ show i
+                          in do put table { strName = Map.insert v (n, i) (strName table)
+                                          , counter = succ i
+                                          }
+                                return (n, i)
 
 getConName :: AbstractValue -> CG Name
 getConName v
@@ -111,37 +112,37 @@ typeOf AbstractBoolean              = return CInt
 typeOf (AbstractScalar (Real _))    = return CDouble
 typeOf AbstractReal                 = return CDouble
 typeOf u@(AbstractScalar (Primitive _))
-    = do str_name <- getStrName u
-         return $ CStruct str_name []
+    = do (str_name, str_index) <- getStrNameAndIndex u
+         return $ CStruct str_name [] str_index
 typeOf u@(AbstractScalar Nil)
-    = do str_name <- getStrName u
-         return $ CStruct str_name []
+    = do (str_name, str_index) <- getStrNameAndIndex u
+         return $ CStruct str_name [] str_index
 typeOf u@(AbstractClosure env _ _)
-    = do str_name <- getStrName u
-         members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
+    = do members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
                               | (x, v) <- Environment.bindings env
                               ]
-         return $ CStruct str_name members
+         (str_name, str_index) <- getStrNameAndIndex u
+         return $ CStruct str_name members str_index
 typeOf u@(AbstractPair car cdr)
-    = do str_name <- getStrName u
-         members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
+    = do members  <- sequence [ liftM2 (,) (typeOf v) (return $ zencode x)
                               | (x, v) <- [("a", car), ("d", cdr)]
                               ]
-         return $ CStruct str_name members
+         (str_name, str_index) <- getStrNameAndIndex u
+         return $ CStruct str_name members str_index
 typeOf AbstractBottom = error "typeOf: AbstractBottom"
 
-genCStructDecl :: AbstractValue -> CG CProg
+genCStructDecl :: AbstractValue -> CG [(CDecl, CDecl)]
 genCStructDecl v
     = do typ <- typeOf v
          case typ of
-           CStruct str_name members ->
+           CStruct str_name members str_index ->
                do con_name <- getConName v
                   let proto = CFunProto typ con_name members
                       body  = [ CLocalVarDecl typ "result" . CStructCon $
                                 [ CVar var | (_, var) <- members ]
                               , CReturn (CVar "result")
                               ]
-                  return [CStructDecl str_name members, CFunDecl proto body]
+                  return [(CStructDecl str_name members str_index, CFunDecl proto body)]
            _ -> return []
 
 valueOf :: AbstractValue -> CExpr
@@ -398,12 +399,15 @@ genCProg program@(expression, initialEnvironment)
                        primitives <- compilePrimitiveApplications
                        thunks <- compileThunks
                        entry <- compileMain expression environment
-                       let (closure_protos, closure_defns) = unzip closures
+                       let (struct_decls, struct_cons) = unzip structs
+                           (closure_protos, closure_defns) = unzip closures
                            (primitive_protos, primitive_defns) = unzip primitives
                            (thunk_protos, thunk_defns) = unzip thunks
                            protos = closure_protos ++ primitive_protos ++ thunk_protos
                            defns = closure_defns ++ primitive_defns ++ thunk_defns
-                       return $ structs ++ globals ++ protos ++ [entry] ++ defns
+                       return $ sortBy (comparing structNum)  struct_decls
+                                  ++ struct_cons ++ globals ++ protos ++ [entry] ++ defns
+      structNum (CStructDecl _ _ i) = i
 
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = liftM concat . sequence . map f

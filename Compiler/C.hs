@@ -7,7 +7,7 @@ import VL.Language.Pretty
 data CType
     = CInt
     | CDouble
-    | CStruct Name [(CType, Name)]
+    | CStruct Name [(CType, Name)] Int
       deriving Show
 
 -- Expressions
@@ -40,7 +40,7 @@ data CDecl
     = CFunProtoDecl CFunProto
     | CFunDecl CFunProto [CStat]
     | CGlobalVarDecl CType Name CExpr
-    | CStructDecl Name [(CType, Name)]
+    | CStructDecl Name [(CType, Name)] Int
       deriving Show
 
 data CFunProto
@@ -63,9 +63,9 @@ col :: (a -> Doc) -> [a] -> Doc
 col printer = vcat . map printer
 
 instance Pretty CType where
-    pp CInt             = text "int"
-    pp CDouble          = text "double"
-    pp (CStruct name _) = text name
+    pp CInt               = text "int"
+    pp CDouble            = text "double"
+    pp (CStruct name _ _) = text name
 
 instance Pretty CExpr where
     pp (CVar x)                = text x
@@ -98,7 +98,7 @@ instance Pretty CDecl where
                ]
     pp (CGlobalVarDecl typ var val)
         = pp typ <+> text var <+> equals <+> pp val <> semi
-    pp (CStructDecl name slots)
+    pp (CStructDecl name slots _)
         = vcat [ text "typedef struct" <+> lbrace
                , nest 4 (col ppSlot slots)
                , rbrace <+> text name <> semi
