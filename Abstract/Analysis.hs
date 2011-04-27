@@ -25,6 +25,8 @@ import VL.Abstract.Value
 
 import Prelude hiding (lookup)
 
+import Data.List (nub)
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -59,10 +61,9 @@ domain :: AbstractAnalysis -> [(CoreExpr, AbstractEnvironment)]
 domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
---values = Map.elems . bindings
-values a = concat [ v : Environment.values (Environment.restrict (freeVariables e) env)
-                  | ((e, env), v) <- toList a
-                  ]
+values a = nub . concat $ [ v : Environment.values env
+                          | ((e, env), v) <- toList a
+                          ]
 
 expand :: CoreExpr
        -> AbstractEnvironment

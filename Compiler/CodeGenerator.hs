@@ -38,7 +38,6 @@ import Debug.Trace
 
 data Table = Table { strName :: Map AbstractValue (Name, Int)
                    , conName :: Map AbstractValue Name
-                   , thkName :: Map AbstractValue Name
                    , appName :: Map (AbstractValue, AbstractValue) Name
                    , counter :: Int
                    }
@@ -51,7 +50,6 @@ runCG = (flip evalState emptyTable .). runReaderT
     where
       emptyTable = Table { strName = Map.empty
                          , conName = Map.empty
-                         , thkName = Map.empty
                          , appName = Map.empty
                          , counter = 0
                          }
@@ -79,18 +77,6 @@ getConName v
            Nothing -> let i = counter table
                           n = zencode $ "#:con-" ++ show i
                       in do put table { conName = Map.insert v n (conName table)
-                                      , counter = succ i
-                                      }
-                            return n
-
-getThkName :: AbstractValue -> CG Name
-getThkName v
-    = do table <- get
-         case Map.lookup v (thkName table) of
-           Just n  -> return n
-           Nothing -> let i = counter table
-                          n = zencode $ "#:thk-" ++ show i
-                      in do put table { thkName = Map.insert v n (thkName table)
                                       , counter = succ i
                                       }
                             return n
@@ -160,7 +146,7 @@ valueOf (AbstractScalar s)
         Boolean False -> CIntLit 0
         Real r        -> CDoubleLit r
         Primitive _   -> CStructCon []
-valueOf _ = error "valueOf: non-solved abstract value"
+valueOf _ = error "valueOf: non-scalar value"
 
 compileGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
 compileGlobalVarDecl x v
@@ -331,56 +317,27 @@ realPrim _                         x = return $ CVar x
 ifProc :: AbstractValue -> Name -> CG CExpr
 ifProc (AbstractPair (AbstractScalar (Boolean True))
                      (AbstractPair thunk _)) x
-    = do thk_name <- getThkName thunk
-         return $ CFunCall thk_name [cdar x]
+    = compileIfBranch thunk (cdar x)
 ifProc (AbstractPair (AbstractScalar (Boolean False))
                      (AbstractPair _ thunk)) x
-    = do thk_name <- getThkName thunk
-         return $ CFunCall thk_name [cddr x]
+    = compileIfBranch thunk (cddr x)
 ifProc (AbstractPair AbstractBoolean
                      (AbstractPair thunk1 thunk2)) x
-    = do thk_name1 <- getThkName thunk1
-         thk_name2 <- getThkName thunk2
-         return $ CTernaryCond (CSlotAccess (CVar x) "a")
-                    (CFunCall thk_name1 [cdar x])
-                    (CFunCall thk_name2 [cddr x])
+    = liftM2 (CTernaryCond (CSlotAccess (CVar x) "a"))
+             (compileIfBranch thunk1 (cdar x))
+             (compileIfBranch thunk2 (cddr x))
+
+compileIfBranch :: AbstractValue -> CExpr -> CG CExpr
+compileIfBranch thunk expr
+    = do fun_name <- getAppName thunk (AbstractScalar Nil)
+         con_name <- getConName (AbstractScalar Nil)
+         return $ CFunCall fun_name [expr, CFunCall con_name []]
 
 cdar :: Name -> CExpr
 cdar x = CSlotAccess (CSlotAccess (CVar x) "d") "a"
 
 cddr :: Name -> CExpr
 cddr x = CSlotAccess (CSlotAccess (CVar x) "d") "d"
-
--- Thunks
-type Thunk = (AbstractEnvironment, Name, CoreExpr)
-
-compileThunk :: Thunk -> CG (CDecl, CDecl)
-compileThunk (env, x, e)
-    = do ret_type <- typeOf =<< (refineEval e env <$> analysis)
-         fun_name <- getThkName thunk
-         thk_type <- typeOf thunk
-         let formals = [(thk_type, "c")]
-         ret_stat <- CReturn <$> compileExpr e env (Environment.domain env)
-         let proto = CFunProto ret_type fun_name formals
-         return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
-    where
-      thunk = AbstractClosure env x e
-
--- I don't know a better way to enumerate all thunks than to say that
--- thunks are precisely the abstract value that we encounter during
--- the compilation of IF-PROCEDURE.  These are precisely the keys of
--- the 'thkName' table.  Having a writer monad inside CG would be
--- cleaner, but at this point I want something working, not something
--- necessarily pretty.
-enumThunks :: CG [Thunk]
-enumThunks
-    = do table <- get
-         return $ nub [ (env, x, e)
-                      | AbstractClosure env x e <- Map.keys (thkName table)
-                      ]
-
-compileThunks :: CG [(CDecl, CDecl)]
-compileThunks = enumThunks >>= mapM compileThunk
 
 -- Compile main function
 compileMain :: CoreExpr -> AbstractEnvironment -> CG CDecl
@@ -408,16 +365,12 @@ compileProg program@(expression, initialEnvironment)
                        closures <- compileClosureApplications
 
                        primitives <- compilePrimitiveApplications
-                       -- It is important that thunks are compiled after primitives because
-                       -- primitives introduce calls to functions corresponding to thunks.
-                       thunks <- compileThunks
                        entry <- compileMain expression environment
                        let (struct_decls, struct_cons) = unzip structs
                            (closure_protos, closure_defns) = unzip closures
                            (primitive_protos, primitive_defns) = unzip primitives
-                           (thunk_protos, thunk_defns) = unzip thunks
-                           protos = closure_protos ++ primitive_protos ++ thunk_protos
-                           defns = closure_defns ++ primitive_defns ++ thunk_defns
+                           protos = closure_protos ++ primitive_protos
+                           defns = closure_defns ++ primitive_defns
                        return $ sortBy (comparing strIndex)  struct_decls
                                   ++ struct_cons ++ globals ++ protos ++ [entry] ++ defns
       strIndex (CStructDecl _ _ i) = i
