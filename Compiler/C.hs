@@ -27,6 +27,7 @@ data CExpr
 -- Statements
 data CStat
     = CReturn CExpr
+    | CPrintf String [CExpr]
     | CLocalVarDecl CType Name CExpr
       deriving Show
 
@@ -37,7 +38,8 @@ data CStat
 -- from the burden of topologically sorting function definitions.
 -- We'll still have to topologically sort 'struct' definitions.
 data CDecl
-    = CFunProtoDecl CFunProto
+    = CInclude String
+    | CFunProtoDecl CFunProto
     | CFunDecl CFunProto [CStat]
     | CGlobalVarDecl CType Name CExpr
     | CStructDecl Name [(CType, Name)] Int
@@ -85,10 +87,18 @@ instance Pretty CExpr where
 instance Pretty CStat where
     pp (CReturn e)
         = text "return" <+> pp e <> semi
+    pp (CPrintf fmt args)
+        = text "printf" <> parens params <> semi
+        where
+          params = sep
+                 . punctuate comma
+                 $ doubleQuotes (text fmt) : map pp args
     pp (CLocalVarDecl typ var val)
         = pp typ <+> text var <+> equals <+> pp val <> semi
 
 instance Pretty CDecl where
+    pp (CInclude file)
+        = text "#include" <+> text file
     pp (CFunProtoDecl proto)
         = pp proto <> semi
     pp (CFunDecl proto body)
@@ -112,5 +122,5 @@ instance Pretty CFunProto where
         where
           ppFormal (typ, var) = pp typ <+> text var
 
-emitCProg :: CProg -> String
-emitCProg = render . col pp
+emitProg :: CProg -> String
+emitProg = render . col pp
