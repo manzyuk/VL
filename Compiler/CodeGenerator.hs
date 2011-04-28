@@ -119,6 +119,9 @@ compileExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis
          fun_name <- getAppName v1 v2
+         -- Don't compile the operator if it is a primitive, and don't
+         -- pass it as a dummy argument to the function that does
+         -- primitive application.
          case v1 of
            AbstractScalar (Primitive _)
              -> do c2 <- compileExpr e2 env fvs
