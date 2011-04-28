@@ -119,9 +119,13 @@ compileExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis
          fun_name <- getAppName v1 v2
-         c1 <- compileExpr e1 env fvs
-         c2 <- compileExpr e2 env fvs
-         return $ CFunCall fun_name [c1, c2]
+         case v1 of
+           AbstractScalar (Primitive _)
+             -> do c2 <- compileExpr e2 env fvs
+                   return $ CFunCall fun_name [c2]
+           _ -> do c1 <- compileExpr e1 env fvs
+                   c2 <- compileExpr e2 env fvs
+                   return $ CFunCall fun_name [c1, c2]
 compileExpr e@(Pair e1 e2) env fvs
     = do pair <- Analysis.lookup e env <$> analysis
          fun_name <- getConName pair
@@ -166,11 +170,9 @@ compilePrimitiveApplication :: PrimitiveValuePair -> CG (CDecl, CDecl)
 compilePrimitiveApplication (p, v)
     = do ret_type <- typeOf =<< (refineApply primitive v <$> analysis)
          fun_name <- getAppName primitive v
-         formals  <- sequence [ liftM2 (,) (typeOf val) (return var)
-                              | (val, var) <- [(primitive, "dummy"), (v, "x")]
-                              ]
+         formal   <- liftM2 (,) (typeOf v) (return "x")
          ret_stat <- CReturn <$> compilePrimitive p v (CVar "x")
-         let proto = CFunProto ret_type fun_name formals
+         let proto = CFunProto ret_type fun_name [formal]
          return (CFunProtoDecl proto, CFunDecl proto [ret_stat])
     where
       primitive = AbstractScalar (Primitive p)
