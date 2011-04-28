@@ -195,6 +195,7 @@ compilePrimitive LTh      = compileComparison (<)  "<"
 compilePrimitive LEq      = compileComparison (<=) "<="
 compilePrimitive GTh      = compileComparison (>)  ">"
 compilePrimitive GEq      = compileComparison (>=) ">="
+compilePrimitive Neg      = compileNeg
 compilePrimitive Exp      = compileUnary exp   "exp"
 compilePrimitive Log      = compileUnary log   "log"
 compilePrimitive Sin      = compileUnary sin   "sin"
@@ -247,6 +248,12 @@ compileComparison op _ (AbstractPair (AbstractScalar (Real r1))
 compileComparison _ op_name v x
     = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
 
+compileNeg :: AbstractValue -> CExpr -> CG CExpr
+compileNeg (AbstractScalar (Real r)) _
+    = return $ CDoubleLit (negate r)
+compileNeg _ x
+    = return $ CNegate x
+
 compileUnary :: (Float -> Float)
              -> Name
              -> AbstractValue
@@ -254,7 +261,8 @@ compileUnary :: (Float -> Float)
              -> CG CExpr
 compileUnary fun _ (AbstractScalar (Real r)) _
     = return $ CDoubleLit (fun r)
-compileUnary _ fun_name _ x = return $ CFunCall fun_name [x]
+compileUnary _ fun_name _ x
+    = return $ CFunCall fun_name [x]
 
 compilePow :: AbstractValue -> CExpr -> CG CExpr
 compilePow (AbstractPair (AbstractScalar (Real r1))
@@ -323,17 +331,18 @@ compileProg program@(expression, initialEnvironment)
                        let (struct_decls,     struct_cons    ) = unzip structs
                            (closure_protos,   closure_defns  ) = unzip closures
                            (primitive_protos, primitive_defns) = unzip primitives
-                           include = CInclude "<stdio.h>"
-                           protos  = closure_protos ++ primitive_protos
-                           defns   = closure_defns  ++ primitive_defns
-                           decls   = concat [ sortBy (comparing strIndex)  struct_decls
-                                            , struct_cons
-                                            , protos
-                                            , globalVars
-                                            , [entryPoint]
-                                            , defns
-                                            ]
-                       return $ include : decls
+                           includes = [CInclude "<stdio.h>", CInclude "<math.h>"]
+                           protos   = closure_protos ++ primitive_protos
+                           defns    = closure_defns  ++ primitive_defns
+                           decls    = concat [ includes
+                                             , sortBy (comparing strIndex)  struct_decls
+                                             , struct_cons
+                                             , protos
+                                             , globalVars
+                                             , [entryPoint]
+                                             , defns
+                                             ]
+                       return decls
       strIndex (CStructDecl _ _ i) = i
 
 compile :: String -> String

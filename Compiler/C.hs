@@ -22,6 +22,7 @@ data CExpr
     | CFunCall Name [CExpr]
     | CBinaryOp Name CExpr CExpr
     | CTernaryCond CExpr CExpr CExpr
+    | CNegate CExpr
       deriving Show
 
 -- Statements
@@ -83,6 +84,7 @@ instance Pretty CExpr where
                                      , colon
                                      , pp c
                                      ]
+    pp (CNegate x)             = parens (char '-' <> pp x)
 
 instance Pretty CStat where
     pp (CReturn e)
