@@ -124,6 +124,22 @@ actually forced (refined) during the flow analysis.  Thus we filter
 out the thunks for which =refineThunk= yields bottom.  This seems to
 fix the problem with non-matching patterns in =genCExpr=.
 
+Hm.  There are closures that look like thunks and for which
+=refineThunk= produces non-bottom, but they are not actually thunks
+passed to =IF-PROCEDURE=.  There is a better way to enumerate thunks:
+just take the keys of the =thkName= table after compiling all the
+primitives!  This seems to produce correct results, but is ugly as
+hell.
+
+I changed the way thunks are forced throughout the program.  A thunk
+is forced by applying it to the empty list.  In the abstract evaluator
+there are two functions =refineThunk= and =expandThunk= that just call
+=refineApply= and =expandApply= resp. with the thunk and
+=AbstractScalar Nil=.  This way forcing of thunks is a particular case
+of the closure application and need not be treated specially by the
+code generator (in particular, we don't need =thkName= table and the
+problem of thunks enumeration disappears).
+
 * Topological sorting of structs
 
 Instead of sorting the struct declarations topologically, we do the
