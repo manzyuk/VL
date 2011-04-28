@@ -11,7 +11,6 @@ import VL.Compiler.ZEncoding
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader
 

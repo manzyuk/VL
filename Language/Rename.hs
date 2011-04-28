@@ -10,8 +10,6 @@ module VL.Language.Rename
 import VL.Language.Common
 import VL.Language.Expression
 
-import VL.Alacarte.Coproduct
-
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -67,7 +65,7 @@ freshVarName = freshName "#:var-"
 -- Consistently rename bound variables of an expression with unique
 -- fresh names.
 renameBound :: CoreExpr -> Supply CoreExpr
-renameBound e@(Var x)    = return e
+renameBound e@(Var _)    = return e
 renameBound (Lam x e)    = do (x', e') <- renameBoundLambda x e
                               return $ Lam x' e'
 renameBound (App e1 e2)  = liftM2 App  (renameBound e1) (renameBound e2)

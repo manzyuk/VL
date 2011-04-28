@@ -16,8 +16,6 @@ import qualified VL.Abstract.Analysis as Analysis
 
 import Prelude hiding (read)
 
-import Control.Arrow
-
 import Control.Monad
 import System.IO
 import Control.Exception
@@ -214,7 +212,7 @@ refineEval :: CoreExpr
            -> AbstractAnalysis
            -> AbstractValue
 refineEval (Var x) env _ = Environment.lookup x env
-refineEval e@(Lam formal body) env a
+refineEval e@(Lam formal body) env _
     = AbstractClosure env' formal body
     where
       env' = Environment.restrict (freeVariables e) env
@@ -350,10 +348,10 @@ interpreter verbosity = do
       repl = do
         putStr prompt
         input <- getLine
-        putStrLn $ interpret input
+        putStrLn $ process input
 
       prompt = "vl> "
-      interpret = case verbosity of
-                    Minimal -> interpretMinimal
-                    Compact -> interpretCompact
-                    Verbose -> interpretVerbose
+      process = case verbosity of
+                  Minimal -> interpretMinimal
+                  Compact -> interpretCompact
+                  Verbose -> interpretVerbose

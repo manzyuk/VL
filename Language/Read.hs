@@ -2,7 +2,6 @@ module VL.Language.Read (read) where
 
 import VL.Language.Iso
 import VL.Language.Scalar
-import VL.Language.Syntax
 import VL.Language.Expression
 
 import qualified VL.Language.Environment as Environment

@@ -62,7 +62,7 @@ domain = Map.keys . bindings
 
 values :: AbstractAnalysis -> [AbstractValue]
 values a = nub . concat $ [ v : Environment.values env
-                          | ((e, env), v) <- toList a
+                          | ((_, env), v) <- toList a
                           ]
 
 expand :: CoreExpr

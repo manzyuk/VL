@@ -7,7 +7,6 @@ import VL.Language.Expression
 import qualified VL.Language.Environment as Environment
 
 import VL.Language.Read
-import VL.Language.Pretty
 
 import VL.Abstract.Value
 import VL.Abstract.Evaluator
@@ -23,8 +22,6 @@ import Prelude hiding (read)
 
 import Data.Ord
 import Data.List
-
-import qualified Data.Set as Set
 
 import Control.Monad
 import Control.Applicative
@@ -90,7 +87,7 @@ compileGlobalVarDecl x v
          return $ CGlobalVarDecl typ (zencode x) (valueOf v)
 
 compileExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
-compileExpr (Var x) env fvs
+compileExpr (Var x) _ fvs
     | x `elem` fvs
     = return $ CSlotAccess (CVar "c") (zencode x)
     | otherwise
@@ -217,7 +214,7 @@ compileArithmetic :: (Float -> Float -> Float)
 compileArithmetic op _ (AbstractPair (AbstractScalar (Real r1))
                                      (AbstractScalar (Real r2))) _
     = return $ CDoubleLit (r1 `op` r2)
-compileArithmetic op op_name v x
+compileArithmetic _ op_name v x
     = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
 
 compileComparison :: (Float -> Float -> Bool)
@@ -261,6 +258,8 @@ compileIfProc (AbstractPair AbstractBoolean
     = liftM2 (CTernaryCond (car x))
              (compileIfBranch thunk1 (cadr x))
              (compileIfBranch thunk2 (cddr x))
+compileIfProc v _
+    = error $ "compileIfProc: malformed IF expression: " ++ show v
 
 compileIfBranch :: AbstractValue -> CExpr -> CG CExpr
 compileIfBranch thunk expr
@@ -301,7 +300,7 @@ compileProg program@(expression, initialEnvironment)
     where
       environment = abstractEnvironment initialEnvironment
       analysis    = analyze program
-      values      = nub (Analysis.values analysis)
+      values      = Analysis.values analysis
       code        = do structs    <- concatMapM compileStructDecl values
                        globals    <- sequence [ compileGlobalVarDecl x v
                                               | (x, v) <- Environment.bindings environment
