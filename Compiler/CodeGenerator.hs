@@ -78,14 +78,19 @@ compileStructDecls
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f = liftM concat . sequence . map f
 
+ctrue, cfalse, cempty :: CExpr
+ctrue     = CIntLit 1
+cfalse    = CIntLit 0
+cempty    = CStructCon []
+
 valueOf :: AbstractValue -> CExpr
 valueOf (AbstractScalar s)
     = case s of
-        Nil           -> CStructCon []
-        Boolean True  -> CIntLit 1
-        Boolean False -> CIntLit 0
+        Nil           -> cempty
+        Boolean True  -> ctrue
+        Boolean False -> cfalse
         Real r        -> CDoubleLit r
-        Primitive _   -> CStructCon []
+        Primitive _   -> cempty
 valueOf _ = error "valueOf: non-scalar value"
 
 compileGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
@@ -183,37 +188,41 @@ compilePrimitiveApplications
     = (enumPrimitiveValuePairs <$> analysis) >>= mapM compilePrimitiveApplication
 
 compilePrimitive :: Primitive -> AbstractValue -> CExpr -> CG CExpr
-compilePrimitive Car      = compileCar
-compilePrimitive Cdr      = compileCdr
-compilePrimitive Add      = compileArithmetic (+)  "+"
-compilePrimitive Sub      = compileArithmetic (-)  "-"
-compilePrimitive Mul      = compileArithmetic (*)  "*"
-compilePrimitive Div      = compileArithmetic (/)  "/"
-compilePrimitive Eql      = compileComparison (==) "=="
-compilePrimitive Neq      = compileComparison (/=) "!="
-compilePrimitive LTh      = compileComparison (<)  "<"
-compilePrimitive LEq      = compileComparison (<=) "<="
-compilePrimitive GTh      = compileComparison (>)  ">"
-compilePrimitive GEq      = compileComparison (>=) ">="
-compilePrimitive Neg      = compileNeg
-compilePrimitive Exp      = compileUnary exp   "exp"
-compilePrimitive Log      = compileUnary log   "log"
-compilePrimitive Sin      = compileUnary sin   "sin"
-compilePrimitive Cos      = compileUnary cos   "cos"
-compilePrimitive Tan      = compileUnary tan   "tan"
-compilePrimitive Asin     = compileUnary asin  "asin"
-compilePrimitive Acos     = compileUnary acos  "acos"
-compilePrimitive Atan     = compileUnary atan  "atan"
-compilePrimitive Sinh     = compileUnary sinh  "sinh"
-compilePrimitive Cosh     = compileUnary cosh  "cosh"
-compilePrimitive Tanh     = compileUnary tanh  "tanh"
-compilePrimitive Sqrt     = compileUnary sqrt  "sqrt"
-compilePrimitive Asinh    = compileUnary asinh "asinh"
-compilePrimitive Acosh    = compileUnary acosh "acosh"
-compilePrimitive Atanh    = compileUnary atanh "atanh"
-compilePrimitive Pow      = compilePow
-compilePrimitive IfProc   = compileIfProc
-compilePrimitive RealPrim = compileRealPrim
+compilePrimitive Car       = compileCar
+compilePrimitive Cdr       = compileCdr
+compilePrimitive Add       = compileArithmetic (+)  "+"
+compilePrimitive Sub       = compileArithmetic (-)  "-"
+compilePrimitive Mul       = compileArithmetic (*)  "*"
+compilePrimitive Div       = compileArithmetic (/)  "/"
+compilePrimitive Eql       = compileComparison (==) "=="
+compilePrimitive Neq       = compileComparison (/=) "!="
+compilePrimitive LTh       = compileComparison (<)  "<"
+compilePrimitive LEq       = compileComparison (<=) "<="
+compilePrimitive GTh       = compileComparison (>)  ">"
+compilePrimitive GEq       = compileComparison (>=) ">="
+compilePrimitive Neg       = compileNeg
+compilePrimitive Exp       = compileUnary exp   "exp"
+compilePrimitive Log       = compileUnary log   "log"
+compilePrimitive Sin       = compileUnary sin   "sin"
+compilePrimitive Cos       = compileUnary cos   "cos"
+compilePrimitive Tan       = compileUnary tan   "tan"
+compilePrimitive Asin      = compileUnary asin  "asin"
+compilePrimitive Acos      = compileUnary acos  "acos"
+compilePrimitive Atan      = compileUnary atan  "atan"
+compilePrimitive Sinh      = compileUnary sinh  "sinh"
+compilePrimitive Cosh      = compileUnary cosh  "cosh"
+compilePrimitive Tanh      = compileUnary tanh  "tanh"
+compilePrimitive Sqrt      = compileUnary sqrt  "sqrt"
+compilePrimitive Asinh     = compileUnary asinh "asinh"
+compilePrimitive Acosh     = compileUnary acosh "acosh"
+compilePrimitive Atanh     = compileUnary atanh "atanh"
+compilePrimitive Pow       = compilePow
+compilePrimitive IfProc    = compileIfProc
+compilePrimitive RealPrim  = compileRealPrim
+compilePrimitive IsNull    = compileIsNull
+compilePrimitive IsPair    = compileIsPair
+compilePrimitive IsReal    = compileIsReal
+compilePrimitive IsBoolean = compileIsBoolean
 
 compileCar :: AbstractValue -> CExpr -> CG CExpr
 compileCar (AbstractPair v@(AbstractScalar _) _) _ = return $ valueOf v
@@ -241,10 +250,10 @@ compileComparison :: (Float -> Float -> Bool)
                   -> CG CExpr
 compileComparison op _ (AbstractPair (AbstractScalar (Real r1))
                                      (AbstractScalar (Real r2))) _
-    = return . CIntLit . bool2int $ r1 `op` r2
+    = return . bool2int $ r1 `op` r2
     where
-      bool2int True  = 1
-      bool2int False = 0
+      bool2int True  = ctrue
+      bool2int False = cfalse
 compileComparison _ op_name v x
     = liftM2 (CBinaryOp op_name) (compileCar v x) (compileCdr v x)
 
@@ -300,6 +309,24 @@ car x = CSlotAccess x "a"
 cdr x = CSlotAccess x "d"
 cadr  = car . cdr
 cddr  = cdr . cdr
+
+compileIsNull :: AbstractValue -> CExpr -> CG CExpr
+compileIsNull (AbstractScalar Nil)            _ = return ctrue
+compileIsNull _                               _ = return cfalse
+
+compileIsPair :: AbstractValue -> CExpr -> CG CExpr
+compileIsPair (AbstractPair _ _)              _ = return ctrue
+compileIsPair _                               _ = return cfalse
+
+compileIsReal :: AbstractValue -> CExpr -> CG CExpr
+compileIsReal (AbstractScalar (Real _))       _ = return ctrue
+compileIsReal AbstractReal                    _ = return ctrue
+compileIsReal _                               _ = return cfalse
+
+compileIsBoolean :: AbstractValue -> CExpr -> CG CExpr
+compileIsBoolean (AbstractScalar (Boolean _)) _ = return ctrue
+compileIsBoolean AbstractBoolean              _ = return ctrue
+compileIsBoolean _                            _ = return cfalse
 
 -- Compile main function
 compileMain :: CoreExpr -> AbstractEnvironment -> CG CDecl
