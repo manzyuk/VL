@@ -71,6 +71,13 @@ compileStructDecl v
                   return [(CStructDecl str_name members str_index, CFunDecl proto body)]
            _ -> return []
 
+compileStructDecls :: CG [(CDecl, CDecl)]
+compileStructDecls
+    = concatMapM compileStructDecl =<< Analysis.values <$> analysis
+
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f = liftM concat . sequence . map f
+
 valueOf :: AbstractValue -> CExpr
 valueOf (AbstractScalar s)
     = case s of
@@ -85,6 +92,12 @@ compileGlobalVarDecl :: Name -> AbstractValue -> CG CDecl
 compileGlobalVarDecl x v
     = do typ <- typeOf v
          return $ CGlobalVarDecl typ (zencode x) (valueOf v)
+
+compileGlobalVarDecls :: AbstractEnvironment -> CG [CDecl]
+compileGlobalVarDecls env
+    = sequence [ compileGlobalVarDecl x v
+               | (x, v) <- Environment.bindings env
+               ]
 
 compileExpr :: CoreExpr -> AbstractEnvironment -> [Name] -> CG CExpr
 compileExpr (Var x) _ fvs
@@ -296,17 +309,13 @@ compileMain expression environment
 
 compileProg :: (CoreExpr, ScalarEnvironment) -> CProg
 compileProg program@(expression, initialEnvironment)
-    = runCG code analysis
+    = runCG code (analyze program)
     where
       environment = abstractEnvironment initialEnvironment
-      analysis    = analyze program
-      values      = Analysis.values analysis
-      code        = do structs    <- concatMapM compileStructDecl values
-                       globals    <- sequence [ compileGlobalVarDecl x v
-                                              | (x, v) <- Environment.bindings environment
-                                              ]
+      code        = do structs    <- compileStructDecls
                        closures   <- compileClosureApplications
                        primitives <- compilePrimitiveApplications
+                       globalVars <- compileGlobalVarDecls environment
                        entryPoint <- compileMain expression environment
                        let (struct_decls,     struct_cons    ) = unzip structs
                            (closure_protos,   closure_defns  ) = unzip closures
@@ -316,16 +325,13 @@ compileProg program@(expression, initialEnvironment)
                            defns   = closure_defns  ++ primitive_defns
                            decls   = concat [ sortBy (comparing strIndex)  struct_decls
                                             , struct_cons
-                                            , globals
                                             , protos
+                                            , globalVars
                                             , [entryPoint]
                                             , defns
                                             ]
                        return $ include : decls
       strIndex (CStructDecl _ _ i) = i
-
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f = liftM concat . sequence . map f
 
 compile :: String -> String
 compile = emitProg . compileProg . read
