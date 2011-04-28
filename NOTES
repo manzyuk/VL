@@ -149,3 +149,28 @@ the moment of its creation.  Furthermore, the function =typeOf=
 ensures that this index is assigned to a struct /after/ assigning
 indexes to the struct's members.  Then sorting the struct declarations
 by their indexes produces the same result as topological sort.
+* Inlining
+  Some inlining could be performed, but I haven't thoroughly thought
+  about that and about difficulties this may face.  For example, C
+  does not have an analog of LET expression, so the only way to get
+  sharing is by stacking a sequence of statements (assign the result
+  of an operation, to a variable, destructure it appropriately, then
+  perform some operations on its parts).  Sharing is necessary, e.g.,
+  when implementing IF-PROCEDURE: it is essentially turned into a
+  ternary conditional x.a ? x.d.a : x.d.d, and if we substitute an
+  expression for x, then this expression is going to be computed
+  twice: once for the predicate and one for the respective branch.
+  Replacing expressions with lists of statements is apparently
+  possible, but then the code generator would be much more complex.
+
+  Thus primitives are treated in the same way as closures: for every
+  primitive application there is a function that is called with the
+  appropriate arguments that does the application.  The body of this
+  function may consist of =return r;= if the result =r= of the
+  application is known to the analysis /and/ can be inlined as a C
+  literal (i.e., if =r= is a real or boolean).  =car= and =cdr= could
+  be inlined too if the results of their applications are known at the
+  analysis time, but these results can be non-literal (pairs,
+  closures), which need to be built by calling appropriate constructor
+  functions.  I am not doing this now, because this would obscure the
+  program.
