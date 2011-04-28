@@ -225,12 +225,10 @@ compilePrimitive IsReal    = compileIsReal
 compilePrimitive IsBoolean = compileIsBoolean
 
 compileCar :: AbstractValue -> CExpr -> CG CExpr
-compileCar (AbstractPair v@(AbstractScalar _) _) _ = return $ valueOf v
-compileCar _                                     x = return $ car x
+compileCar _ x = return $ car x
 
 compileCdr :: AbstractValue -> CExpr -> CG CExpr
-compileCdr (AbstractPair _ v@(AbstractScalar _)) _ = return $ valueOf v
-compileCdr _                                     x = return $ cdr x
+compileCdr _ x = return $ cdr x
 
 compileArithmetic :: (Float -> Float -> Float)
                   -> Name
