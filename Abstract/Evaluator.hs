@@ -64,6 +64,9 @@ refinePrimitive Atan  _ = unary atan
 refinePrimitive Sinh  _ = unary sinh
 refinePrimitive Cosh  _ = unary cosh
 refinePrimitive Tanh  _ = unary tanh
+refinePrimitive Asinh _ = unary asinh
+refinePrimitive Acosh _ = unary acosh
+refinePrimitive Atanh _ = unary atanh
 
 refinePrimitive IfProc a = refineIfProc a
 

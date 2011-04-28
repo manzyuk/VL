@@ -25,6 +25,7 @@ data Primitive
     | Sin   | Cos   | Tan
     | Asin  | Acos  | Atan
     | Sinh  | Cosh  | Tanh
+    | Asinh | Acosh | Atanh
     -- IF-PROCEDURE primitive
     | IfProc
     -- shape predicates
@@ -70,6 +71,9 @@ primitives = Environment.fromList . map (second Primitive) $
              , ("sinh"           , Sinh      )
              , ("cosh"           , Cosh      )
              , ("tanh"           , Tanh      )
+             , ("asinh"          , Asinh     )
+             , ("acosh"          , Acosh     )
+             , ("atanh"          , Atanh     )
 
              , ("#:if-procedure" , IfProc    )
 
@@ -116,6 +120,9 @@ instance Pretty Primitive where
     pp Sinh      = prim "sinh"
     pp Cosh      = prim "cosh"
     pp Tanh      = prim "tanh"
+    pp Asinh     = prim "asinh"
+    pp Acosh     = prim "acosh"
+    pp Atanh     = prim "atanh"
     pp Neg       = prim "negate"
     pp IfProc    = prim "if-procedure"
     pp IsNull    = prim "null?"

@@ -62,6 +62,9 @@ dispatch Atan  = unary atan
 dispatch Sinh  = unary sinh
 dispatch Cosh  = unary cosh
 dispatch Tanh  = unary tanh
+dispatch Asinh = unary asinh
+dispatch Acosh = unary acosh
+dispatch Atanh = unary atanh
 
 dispatch IfProc = primIfProc
 
