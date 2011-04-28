@@ -1,0 +1,15 @@
+(let ((z (lambda (f)
+           ((lambda (x)
+              (f (lambda (y)
+                   ((x x) y))))
+            (lambda (x)
+              (f (lambda (y)
+                   ((x x) y)))))))
+      (fact (lambda (f)
+              (lambda (x)
+                (if (== x 0)
+                    1
+                    (* x (f (- x 1))))))))
+  ((z fact) (real 5)))
+
+;; 120.000000

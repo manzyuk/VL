@@ -2,3 +2,5 @@
 *.o
 test
 /vl2c
+/Test/vl/*.c
+/Test/vl/*.out

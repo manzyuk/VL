@@ -1,0 +1,15 @@
+(letrec ((map (f l)
+           (if (pair? l)
+               (cons (f (car l))
+                     (map f (cdr l)))
+               ()))
+         (sum (l)
+           (if (pair? l)
+               (+ (car l)
+                  (sum (cdr l)))
+               0)))
+  (sum
+   (map (lambda (x) (* 2 x))
+        (list (real 1) (real 2) (real 3)))))
+
+;; 12.000000

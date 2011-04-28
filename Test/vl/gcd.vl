@@ -1,0 +1,9 @@
+(letrec ((gcd (a b)
+           (if (== a 0)
+               b
+               (if (< a b)
+                   (gcd b a)
+                   (gcd (- a b) b)))))
+  (gcd (real 18) (real 15)))
+
+;; 3.000000
