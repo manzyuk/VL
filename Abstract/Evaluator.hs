@@ -51,6 +51,7 @@ refinePrimitive LTh   _ = comparison (<)
 refinePrimitive LEq   _ = comparison (<=)
 refinePrimitive GTh   _ = comparison (>)
 refinePrimitive GEq   _ = comparison (>=)
+refinePrimitive Neg   _ = unary negate
 refinePrimitive Exp   _ = unary exp
 refinePrimitive Log   _ = unary log
 refinePrimitive Sin   _ = unary sin
@@ -63,10 +64,6 @@ refinePrimitive Atan  _ = unary atan
 refinePrimitive Sinh  _ = unary sinh
 refinePrimitive Cosh  _ = unary cosh
 refinePrimitive Tanh  _ = unary tanh
-refinePrimitive Asinh _ = unary asinh
-refinePrimitive Acosh _ = unary acosh
-refinePrimitive Atanh _ = unary atanh
-refinePrimitive Neg   _ = unary negate
 
 refinePrimitive IfProc a = refineIfProc a
 

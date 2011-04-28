@@ -49,6 +49,7 @@ dispatch LTh   = comparison (<)
 dispatch LEq   = comparison (<=)
 dispatch GTh   = comparison (>)
 dispatch GEq   = comparison (>=)
+dispatch Neg   = unary negate
 dispatch Exp   = unary exp
 dispatch Log   = unary log
 dispatch Sin   = unary sin
@@ -61,10 +62,6 @@ dispatch Atan  = unary atan
 dispatch Sinh  = unary sinh
 dispatch Cosh  = unary cosh
 dispatch Tanh  = unary tanh
-dispatch Asinh = unary asinh
-dispatch Acosh = unary acosh
-dispatch Atanh = unary atanh
-dispatch Neg   = unary negate
 
 dispatch IfProc = primIfProc
 

@@ -25,7 +25,6 @@ data Primitive
     | Sin   | Cos   | Tan
     | Asin  | Acos  | Atan
     | Sinh  | Cosh  | Tanh
-    | Asinh | Acosh | Atanh
     -- IF-PROCEDURE primitive
     | IfProc
     -- shape predicates
@@ -41,49 +40,46 @@ type ScalarEnvironment = Environment Scalar
 
 primitives :: ScalarEnvironment
 primitives = Environment.fromList . map (second Primitive) $
-	     [ ("car"            , Car       )
-	     , ("cdr"            , Cdr       )
+             [ ("car"            , Car       )
+             , ("cdr"            , Cdr       )
 
-	     , ("+"              , Add       )
-	     , ("-"              , Sub       )
-	     , ("*"              , Mul       )
-	     , ("/"              , Div       )
-	     , ("negate"         , Neg       )
+             , ("+"              , Add       )
+             , ("-"              , Sub       )
+             , ("*"              , Mul       )
+             , ("/"              , Div       )
+             , ("negate"         , Neg       )
 
-	     , ("=="             , Eql       )
-	     , ("/="             , Neq       )
-	     , ("<"              , LTh       )
-	     , ("<="             , LEq       )
-	     , (">"              , GTh       )
-	     , (">="             , GEq       )
+             , ("=="             , Eql       )
+             , ("/="             , Neq       )
+             , ("<"              , LTh       )
+             , ("<="             , LEq       )
+             , (">"              , GTh       )
+             , (">="             , GEq       )
 
-	     , ("exp"            , Exp       )
-	     , ("log"            , Log       )
-	     , ("**"             , Pow       )
-	     , ("sqrt"           , Sqrt      )
+             , ("exp"            , Exp       )
+             , ("log"            , Log       )
+             , ("**"             , Pow       )
+             , ("sqrt"           , Sqrt      )
 
-	     , ("sin"            , Sin       )
-	     , ("cos"            , Cos       )
-	     , ("tan"            , Tan       )
-	     , ("asin"           , Asin      )
-	     , ("acos"           , Acos      )
-	     , ("atan"           , Atan      )
-	     , ("sinh"           , Sinh      )
-	     , ("cosh"           , Cosh      )
-	     , ("tanh"           , Tanh      )
-	     , ("asinh"          , Asinh     )
-	     , ("acosh"          , Acosh     )
-	     , ("atanh"          , Atanh     )
+             , ("sin"            , Sin       )
+             , ("cos"            , Cos       )
+             , ("tan"            , Tan       )
+             , ("asin"           , Asin      )
+             , ("acos"           , Acos      )
+             , ("atan"           , Atan      )
+             , ("sinh"           , Sinh      )
+             , ("cosh"           , Cosh      )
+             , ("tanh"           , Tanh      )
 
-	     , ("#:if-procedure" , IfProc    )
+             , ("#:if-procedure" , IfProc    )
 
-	     , ("null?"          , IsNull    )
-	     , ("pair?"          , IsPair    )
-	     , ("real?"          , IsReal    )
-	     , ("boolean?"       , IsBoolean )
+             , ("null?"          , IsNull    )
+             , ("pair?"          , IsPair    )
+             , ("real?"          , IsReal    )
+             , ("boolean?"       , IsBoolean )
 
-	     , ("real"           , RealPrim  )
-	     ]
+             , ("real"           , RealPrim  )
+             ]
 
 -- Pretty-printing of scalars
 instance Pretty Scalar where
@@ -120,9 +116,6 @@ instance Pretty Primitive where
     pp Sinh      = prim "sinh"
     pp Cosh      = prim "cosh"
     pp Tanh      = prim "tanh"
-    pp Asinh     = prim "asinh"
-    pp Acosh     = prim "acosh"
-    pp Atanh     = prim "atanh"
     pp Neg       = prim "negate"
     pp IfProc    = prim "if-procedure"
     pp IsNull    = prim "null?"
