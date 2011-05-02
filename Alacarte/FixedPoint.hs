@@ -60,7 +60,7 @@ defineSC con = funD name' clauses
       (name, name', vars) = generateNames con
       clauses             = [clause (map varP vars) body []]
       body                = normalB (appE (varE 'inject)
-				     (foldl appE (conE name) (map varE vars)))
+                                     (foldl appE (conE name) (map varE vars)))
 
 -- Derive instances of a class for a list of given type names.
 --
@@ -85,8 +85,8 @@ deriveAlgebraInstances = mapM . deriveAlgebraInstance
 
 deriveAlgebraInstance :: Name -> Name -> Q Dec
 deriveAlgebraInstance cl ty = do
-  ClassI (ClassD _ _ _ _ [SigD name _]) <- reify cl
-  TyConI (DataD  _ _ _ cs _)            <- reify ty
+  ClassI (ClassD _ _ _ _ [SigD name _]) _ <- reify cl
+  TyConI (DataD  _ _ _ cs _)              <- reify ty
   instanceD (cxt []) (appT (conT cl) (conT ty)) (map (defineAlgebra name) cs)
 
 defineAlgebra :: Name -> Con -> Q Dec
