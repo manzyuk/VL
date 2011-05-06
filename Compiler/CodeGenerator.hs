@@ -76,7 +76,7 @@ compileStructDecls
     = concatMapM compileStructDecl =<< Analysis.values <$> analysis
 
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
-concatMapM f = liftM concat . sequence . map f
+concatMapM f = liftM concat . mapM f
 
 ctrue, cfalse, cempty :: CExpr
 ctrue     = CIntLit 1
