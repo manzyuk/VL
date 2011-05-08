@@ -1,15 +1,17 @@
+;; NOTE: This example is contrived because in general 'filter' is not
+;; a union-free program.
 (letrec ((filter (p l)
-           (if (pair? l)
-               (if (p (car l))
-                   (cons p (filter p (cdr l)))
-                   (filter p (cdr l)))
-               ()))
-         (length (l)
-           (if (pair? l)
-               (+ 1 (length (cdr l)))
-               0)))
+	   (if (pair? l)
+	       (if (p (car l))
+		   (cons p (filter p (cdr l)))
+		   (filter p (cdr l)))
+	       ()))
+	 (length (l)
+	   (if (pair? l)
+	       (+ 1 (length (cdr l)))
+	       0)))
   (length
     (filter boolean?
-            (list (< 1 (real 3)) 2 (cons 4 5) #f (lambda (x) x)))))
+	    (list (< 1 (real 3)) 2 (cons 4 5) #f (lambda (x) x)))))
 
 ;; 2.000000
