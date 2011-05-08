@@ -22,7 +22,7 @@ you.
 * template-haskell-2.5.0.0 (_not_ 2.4.0.0, which has a slightly
   different API)
 
-* (test-framework)[http://batterseapower.github.com/test-framework/]
+* [test-framework](http://batterseapower.github.com/test-framework/)
   for running the evaluator test suite
 
 ## Compiling
