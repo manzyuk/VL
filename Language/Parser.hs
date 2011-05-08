@@ -88,19 +88,6 @@ parseConstant = do s <- try parseEmptyList <|> token maybeConstant
 parseEmptyList :: Parser Scalar
 parseEmptyList = Scalar.Nil <$ (lparen >> rparen)
 
--- Helper combinators and aliases for better readability.
-parens :: Parser a -> Parser a
-parens = between lparen rparen
-
-listOf :: Parser a -> Parser [a]
-listOf p = parens (many p)
-
-formals :: Parser [Name]
-formals = listOf identifier
-
-body :: Parser SurfaceSyntax
-body = expression
-
 -- The association list of special form names to the their parsers.
 specialForms :: [(String, Parser SurfaceSyntax)]
 specialForms = [ ("lambda", parseLambda  )
@@ -119,6 +106,19 @@ specialForms = [ ("lambda", parseLambda  )
 -- The list of reserved keywords.
 keywords :: [String]
 keywords = map fst specialForms
+
+-- Helper combinators and aliases for better readability.
+parens :: Parser a -> Parser a
+parens = between lparen rparen
+
+listOf :: Parser a -> Parser [a]
+listOf p = parens (many p)
+
+formals :: Parser [Name]
+formals = listOf identifier
+
+body :: Parser SurfaceSyntax
+body = expression
 
 -- Special form parsers.
 parseLambda, parseCons, parseList, parseConsStar :: Parser SurfaceSyntax
