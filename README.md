@@ -45,8 +45,7 @@ To test the compiler, run
 
 To add a test to the compiler test suite, add a file with extension
 `.vl` to the directory `Test/vl` containing the VL code of the program
-and put the expected value in the comment in the last line of the
-file.
+and put the expected value in a comment in the last line of the file.
 
 ## Bibliography
 
