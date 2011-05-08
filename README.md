@@ -1,6 +1,6 @@
-# An aggressively optimizing compiler for the VL language
+## An aggressively optimizing compiler for the VL language
 
-## Overview
+### Overview
 
 The name VL is derived from VLAD, which is a higher-order functional
 programming language that supports automatic differentiation (AD); see
@@ -17,7 +17,7 @@ although I'm not planning to develop it any further.  Still, if you
 spot bugs or have improvement suggestions, I'd be glad to hear from
 you.
 
-## Dependencies
+### Dependencies
 
 * template-haskell-2.5.0.0 (_not_ 2.4.0.0, which has a slightly
   different API)
@@ -25,13 +25,13 @@ you.
 * [test-framework](http://batterseapower.github.com/test-framework/)
   for running the evaluator test suite
 
-## Compiling
+### Compiling
 
 To compile the VL to C compiler, run
 
     make vl2c
 
-## Testing
+### Testing
 
 To test both the concrete and abstract evaluator, run
 
@@ -47,7 +47,7 @@ To add a test to the compiler test suite, add a file with extension
 `.vl` to the directory `Test/vl` containing the VL code of the program
 and put the expected value in a comment in the last line of the file.
 
-## Bibliography
+### Bibliography
 
 [1] Jeffrey Siskind and Barak Pearlmutter, _Using Polyvariant
 Union-Free Flow Analysis to Compile a Higher-Order Functional
