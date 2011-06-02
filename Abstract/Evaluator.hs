@@ -207,19 +207,37 @@ primReal AbstractReal              = AbstractReal
 primReal AbstractBottom               = AbstractBottom
 primReal v = error $ "primReal: the argument is not a real " ++ show v
 
+-- Originally, 'refineEval'' was called 'refineEval', and there was no
+-- 'refineEval''.  However, Alexey and I have discovered recently that
+-- so defined 'refineEval' is not monotonic and can lose information;
+-- in particular, it can return AbstractBottom even for a binding that
+-- is already known to evaluate to a non-bottom.  This has not bitten
+-- us because in 'amendAnalysis' each binding is refined, and even if
+-- 'refineEval' returns AbstractBottom for some binding, this is going
+-- to be fixed by subsequent amendments, and the information necessary
+-- for that is kept in the analysis.  We don't want to depend on that.
+-- The right way to fix this problem is to really make 'refineEval'
+-- monotonic, e.g., by taking the union of the old value of the
+-- binding with the new, refined value.
 refineEval :: CoreExpr
            -> AbstractEnvironment
            -> AbstractAnalysis
            -> AbstractValue
-refineEval (Var x) env _ = Environment.lookup x env
-refineEval e@(Lam formal body) env _
+refineEval e env a = Analysis.lookup e env a `joinValues` refineEval' e env a
+
+refineEval' :: CoreExpr
+            -> AbstractEnvironment
+            -> AbstractAnalysis
+            -> AbstractValue
+refineEval' (Var x) env _ = Environment.lookup x env
+refineEval' e@(Lam formal body) env _
     = AbstractClosure env' formal body
     where
       env' = Environment.restrict (freeVariables e) env
-refineEval (App operator operand) env a
+refineEval' (App operator operand) env a
     = refineApply (Analysis.lookup operator env a)
                   (Analysis.lookup operand  env a) a
-refineEval (Pair e1 e2) env a
+refineEval' (Pair e1 e2) env a
     | v1 /= AbstractBottom && v2 /= AbstractBottom
     = AbstractPair v1 v2
     | otherwise
@@ -227,8 +245,8 @@ refineEval (Pair e1 e2) env a
     where
       v1 = Analysis.lookup e1 env a
       v2 = Analysis.lookup e2 env a
-refineEval (Letrec bindings body) env a
-    = refineEval (pushLetrec bindings body) env a
+refineEval' (Letrec bindings body) env a
+    = refineEval' (pushLetrec bindings body) env a
 
 expandApply :: AbstractValue
             -> AbstractValue
