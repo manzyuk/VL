@@ -15,7 +15,7 @@ import Control.Arrow
 -- tedious.  With difference lists we can be efficient and write in a
 -- more natural style.
 -- See http://book.realworldhaskell.org/read/data-structures.html#data.dlist
-newtype DList a = DL { unDL :: [a] -> [a] }
+newtype DList a = DL ([a] -> [a])
 
 instance Monoid (DList a) where
     mempty = DL id
