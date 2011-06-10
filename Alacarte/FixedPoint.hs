@@ -100,5 +100,5 @@ generateNames :: Con -> (Name, Name, [Name])
 generateNames (NormalC name args) = (name, name', vars)
     where
       name' = mkName ('m' : 'k' : nameBase name)
-      vars  = [mkName ('x' : show i) | (i, _) <- zip [1..] args]
+      vars  = [mkName ('x' : show i) | (i, _) <- zip [(1 :: Integer)..] args]
 generateNames _ = error "generateNames: the argument is not a normal constructor"
