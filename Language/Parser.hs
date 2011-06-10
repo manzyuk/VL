@@ -6,7 +6,6 @@ import VL.Language.Scalar (Scalar, ScalarEnvironment)
 import qualified VL.Language.Scalar as Scalar
 
 import VL.Language.Syntax
-import VL.Language.Pretty (pprint)
 
 import qualified VL.Language.Environment as Environment
 
@@ -38,8 +37,8 @@ literal :: Token -> Parser Token
 literal t = token maybeLiteral
     where
       maybeLiteral x
-	  | x == t    = Just x
-	  | otherwise = Nothing
+          | x == t    = Just x
+          | otherwise = Nothing
 
 lparen, rparen :: Parser Token
 lparen = literal Token.LParen
@@ -51,8 +50,8 @@ identifier :: Parser Name
 identifier = token maybeIdentifier
     where
       maybeIdentifier (Token.Identifier x)
-	  | x `notElem` keywords = Just x
-	  | otherwise            = Nothing
+          | x `notElem` keywords = Just x
+          | otherwise            = Nothing
       maybeIdentifier _          = Nothing
 
 -- Accepts a token 't' with the result 'n' when 't' is the identifier
@@ -61,8 +60,8 @@ keyword :: Parser Name
 keyword = token maybeKeyword
     where
       maybeKeyword (Token.Identifier x)
-	  | x `elem` keywords = Just x
-	  | otherwise         = Nothing
+          | x `elem` keywords = Just x
+          | otherwise         = Nothing
       maybeKeyword _          = Nothing
 
 parseVariable :: Parser SurfaceSyntax
@@ -70,16 +69,16 @@ parseVariable = mkVariable <$> identifier
 
 parseConstant :: Parser SurfaceSyntax
 parseConstant = do s <- try parseEmptyList <|> token maybeConstant
-		   (env, i) <- get
-		   -- (), #t, #f are always converted to the same
-		   -- global names "#:nil", "#:true", "#:false".
-		   let x = case s of
-			     Scalar.Nil           -> nil
-			     Scalar.Boolean True  -> true
-			     Scalar.Boolean False -> false
-			     Scalar.Real _        -> "#:real-" ++ show i
-		   put (Environment.update x s env, succ i)
-		   return (mkVariable x)
+                   (env, i) <- get
+                   -- (), #t, #f are always converted to the same
+                   -- global names "#:nil", "#:true", "#:false".
+                   let x = case s of
+                             Scalar.Nil           -> nil
+                             Scalar.Boolean True  -> true
+                             Scalar.Boolean False -> false
+                             Scalar.Real _        -> "#:real-" ++ show i
+                   put (Environment.update x s env, succ i)
+                   return (mkVariable x)
     where
       maybeConstant (Token.Boolean b) = Just (Scalar.Boolean b)
       maybeConstant (Token.Real    r) = Just (Scalar.Real    r)
@@ -91,17 +90,17 @@ parseEmptyList = Scalar.Nil <$ (lparen >> rparen)
 -- The association list of special form names to the their parsers.
 specialForms :: [(String, Parser SurfaceSyntax)]
 specialForms = [ ("lambda", parseLambda  )
-	       , ("cons"  , parseCons    )
-	       , ("list"  , parseList    )
-	       , ("cons*" , parseConsStar)
-	       , ("if"    , parseIf      )
-	       , ("or"    , parseOr      )
-	       , ("and"   , parseAnd     )
-	       , ("not"   , parseNot     )
-	       , ("cond"  , parseCond    )
-	       , ("let"   , parseLet     )
-	       , ("letrec", parseLetrec  )
-	       ]
+               , ("cons"  , parseCons    )
+               , ("list"  , parseList    )
+               , ("cons*" , parseConsStar)
+               , ("if"    , parseIf      )
+               , ("or"    , parseOr      )
+               , ("and"   , parseAnd     )
+               , ("not"   , parseNot     )
+               , ("cond"  , parseCond    )
+               , ("let"   , parseLet     )
+               , ("letrec", parseLetrec  )
+               ]
 
 -- The list of reserved keywords.
 keywords :: [String]
@@ -170,7 +169,7 @@ expression = atom <|> list
     where
       atom = parseVariable <|> parseConstant
       list = parens $ try parseSpecialForm
-		      <|> parseApplication
+                      <|> parseApplication
 
 parse :: String -> (SurfaceSyntax, ScalarEnvironment)
 parse = ((either (\_ -> error "parse error") id) *** fst)
@@ -179,8 +178,8 @@ parse = ((either (\_ -> error "parse error") id) *** fst)
       . Token.scan
     where
       initialEnvironment
-	  = Environment.fromList
-	    [ (nil,   Scalar.Nil          )
-	    , (true,  Scalar.Boolean True )
-	    , (false, Scalar.Boolean False)
-	    ]
+          = Environment.fromList
+            [ (nil,   Scalar.Nil          )
+            , (true,  Scalar.Boolean True )
+            , (false, Scalar.Boolean False)
+            ]
