@@ -5,7 +5,6 @@ module VL.Compiler.ZEncoding (zencode) where
 import Data.Maybe
 import Data.Monoid
 
-import Data.Map (Map)
 import qualified Data.Map as Map
 
 import Control.Arrow
