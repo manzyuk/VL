@@ -1,6 +1,5 @@
 *.hi
 *.o
-test
-/vl2c
-/Test/vl/*.c
-/Test/vl/*.out
+/dist
+/test/vl/*.c
+/test/vl/*.out
