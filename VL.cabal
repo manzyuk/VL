@@ -1,0 +1,32 @@
+name:                   VL
+version:                1.0
+description:            An aggressively optimizing compiler for the VL language
+license:                PublicDomain
+license-file:           LICENSE
+author:                 Oleksandr Manzyuk
+maintainer:             manzyuk@gmail.com
+build-type:             Simple
+cabal-version:          >=1.8
+
+executable vl2c
+  main-is:              vl2c.hs
+  hs-source-dirs:       src
+  build-depends:
+    base, filepath, containers, mtl, pretty, template-haskell >= 2.5, parsec
+  ghc-options:          -O2 -Wall
+
+test-suite test-evaluator
+  type:                 exitcode-stdio-1.0
+  main-is:              test-evaluator.hs
+  hs-source-dirs:       test, src
+  build-depends:
+    base, containers, mtl, pretty, template-haskell >= 2.5, parsec,
+    HUnit, test-framework, test-framework-hunit
+  ghc-options:          -O2 -Wall
+
+test-suite test-compiler
+  type:                 exitcode-stdio-1.0
+  main-is:              test-compiler.hs
+  hs-source-dirs:       test, src
+  build-depends:
+    base, directory, process, filepath, mtl, Glob
