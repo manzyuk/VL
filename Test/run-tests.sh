@@ -14,9 +14,9 @@ FAILED=0
 for file in Test/vl/*.vl
 do
     NAME=${file%.vl}
-    RECEIVED=$($DIR/vl2c $NAME.vl $NAME.c \
-        && gcc $NAME.c -o $NAME.out && ./$NAME.out)
-    EXPECTED=$(tail -1 $NAME.vl | tr -d ";\n ")
+    RECEIVED=$("$DIR/vl2c" "$NAME.vl" "$NAME.c" \
+        && gcc "$NAME.c" -o "$NAME.out" && "./$NAME.out")
+    EXPECTED=$(tail -1 "$NAME.vl" | tr -d ";\n ")
     if [[ "$RECEIVED" == "$EXPECTED" ]]
     then
         printf "%-50s PASSED\n" $file
