@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, TypeOperators #-}
+{-# LANGUAGE TypeOperators, FlexibleInstances #-}
 module VL.Language.Pretty
     ( Pretty
     , pp
