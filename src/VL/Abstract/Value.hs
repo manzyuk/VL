@@ -52,18 +52,18 @@ joinValues (AbstractClosure env1 x1 e1) (AbstractClosure env2 x2 e2)
       -- equal, then the environments must contain the same set of
       -- variables.
       joinEnvironments env _
-	  = Environment.fromList $ map joinBindings (Environment.domain env)
+          = Environment.fromList $ map joinBindings (Environment.domain env)
       joinBindings x
-	  = (x, (Environment.lookup x env1) `joinValues` (Environment.lookup x env2))
+          = (x, (Environment.lookup x env1) `joinValues` (Environment.lookup x env2))
 joinValues (AbstractPair v1 v2) (AbstractPair v1' v2')
     = AbstractPair (v1 `joinValues` v1') (v2 `joinValues` v2')
 joinValues v1 v2
     = error $ unwords [ "joinValues: join of"
-		      , show v1
-		      , "and"
-		      , show v2
-		      , "doesn't exist"
-		      ]
+                      , show v1
+                      , "and"
+                      , show v2
+                      , "doesn't exist"
+                      ]
 
 isSomeBoolean, isSomeReal :: AbstractValue -> Bool
 

@@ -14,7 +14,7 @@ module VL.Language.Pretty
 
 import VL.Language.Common
 
-import Text.PrettyPrint
+import Text.PrettyPrint hiding ((<>))
 
 class Pretty a where
     pp :: a -> Doc

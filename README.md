@@ -23,30 +23,22 @@ from you.
 
 To compile the VL to C compiler, run
 
-    cabal configure
-    cabal build
+	stack build
 
 ### Testing
 
-To build the test suites, configure with the `--enable-tests` flag:
+To build and run the test suites, run:
 
-    cabal configure --enable-tests
+	stack test
 
-and then build:
-
-    cabal build
-
-The `VL.cabal` file defines two test suites: `test-evaluator`, which
-tests both the concrete and abstract evaluator, and `test-compiler`,
-which tests the compiler.  The tests can be run by
-
-    cabal test
-
-To add more tests to the evaluator test suite, edit the source file
-`test/test-evaluator.hs`.  To add a test to the compiler test suite,
-drop a file with the extension `.vl` containing the VL source code of
-the program into the directory `test/vl` and put the expected value in
-a comment in the last line of that file.
+The `package.yaml` file defines two test suites: `test-evaluator`,
+which tests both the concrete and abstract evaluator, and
+`test-compiler`, which tests the compiler.  To add more tests to the
+evaluator test suite, edit the source file `test/test-evaluator.hs`.
+To add a test to the compiler test suite, drop a file with the
+extension `.vl` containing the VL source code of the program into the
+directory `test/vl` and put the expected value in a comment in the
+last line of that file.
 
 ### Bibliography
 

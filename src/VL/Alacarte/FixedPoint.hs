@@ -51,7 +51,7 @@ defineSmartConstructors = liftM concat . mapM defineSCs
 
 defineSCs :: Name -> Q [Dec]
 defineSCs name = do
-  TyConI (DataD _ _ _ cs _) <- reify name
+  TyConI (DataD _ _ _ _ cs _) <- reify name
   mapM defineSC cs
 
 defineSC :: Con -> Q Dec
@@ -86,7 +86,7 @@ deriveAlgebraInstances = mapM . deriveAlgebraInstance
 deriveAlgebraInstance :: Name -> Name -> Q Dec
 deriveAlgebraInstance cl ty = do
   ClassI (ClassD _ _ _ _ [SigD name _]) _ <- reify cl
-  TyConI (DataD  _ _ _ cs _)              <- reify ty
+  TyConI (DataD  _ _ _ _ cs _)            <- reify ty
   instanceD (cxt []) (appT (conT cl) (conT ty)) (map (defineAlgebra name) cs)
 
 defineAlgebra :: Name -> Con -> Q Dec

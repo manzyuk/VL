@@ -111,10 +111,13 @@ compileExpr (Var x) _ fvs
     | otherwise
     = return $ CVar (zencode x)
 compileExpr e@(Lam _ _) env fvs
-    = do closure@(AbstractClosure closure_env _ _) <- Analysis.lookup e env <$> analysis
-         fun_name <- getConName closure
-         args <- sequence [compileExpr (Var x) env fvs | x <- Environment.domain closure_env]
-         return $ CFunCall fun_name args
+    = do v <- Analysis.lookup e env <$> analysis
+         case v of
+           closure@(AbstractClosure closure_env _ _) -> do
+             fun_name <- getConName closure
+             args <- sequence [compileExpr (Var x) env fvs | x <- Environment.domain closure_env]
+             return $ CFunCall fun_name args
+           _ -> error $ "unexpected value: " ++ show v
 compileExpr (App e1 e2) env fvs
     = do v1 <- Analysis.lookup e1 env <$> analysis
          v2 <- Analysis.lookup e2 env <$> analysis

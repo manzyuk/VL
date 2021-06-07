@@ -1,0 +1,73 @@
+name:                VL
+version:             1.0
+github:              "manzyuk/VL"
+license:             PublicDomain
+author:              "Oleksandr Manzyuk"
+maintainer:          "manzyuk@gmail.com"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            An aggressively optimizing compiler for the VL language
+# category:            Compiler
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/VL#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- template-haskell
+- containers
+- pretty
+- mtl
+- parsec
+
+library:
+  source-dirs: src
+
+executables:
+  vl2c:
+    main:                vl2c.hs
+    source-dirs:         src
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -Wall
+    dependencies:
+    - VL
+    - filepath
+
+tests:
+  test-evaluator:
+    main:                test-evaluator.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    dependencies:
+    - VL
+    - HUnit
+    - test-framework
+    - test-framework-hunit
+  test-compiler:
+    main:                test-compiler.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    dependencies:
+    - VL
+    - filepath
+    - directory
+    - process
+    - Glob

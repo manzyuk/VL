@@ -1,32 +1,145 @@
-name:                   VL
-version:                1.0
-description:            An aggressively optimizing compiler for the VL language
-license:                PublicDomain
-license-file:           LICENSE
-author:                 Oleksandr Manzyuk
-maintainer:             manzyuk@gmail.com
-build-type:             Simple
-cabal-version:          >=1.8
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           VL
+version:        1.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/VL#readme>
+homepage:       https://github.com/manzyuk/VL#readme
+bug-reports:    https://github.com/manzyuk/VL/issues
+author:         Oleksandr Manzyuk
+maintainer:     manzyuk@gmail.com
+license:        PublicDomain
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/manzyuk/VL
+
+library
+  exposed-modules:
+      VL.Abstract.Analysis
+      VL.Abstract.Evaluator
+      VL.Abstract.Value
+      VL.Alacarte.Coproduct
+      VL.Alacarte.FixedPoint
+      VL.Compiler.C
+      VL.Compiler.CodeGenerator
+      VL.Compiler.Monad
+      VL.Compiler.ZEncoding
+      VL.Concrete.Evaluator
+      VL.Concrete.Value
+      VL.Language.Common
+      VL.Language.Desugar
+      VL.Language.Environment
+      VL.Language.Expression
+      VL.Language.Iso
+      VL.Language.Parser
+      VL.Language.Pretty
+      VL.Language.Read
+      VL.Language.Rename
+      VL.Language.Scalar
+      VL.Language.Syntax
+      VL.Language.Token
+  other-modules:
+      Paths_VL
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , mtl
+    , parsec
+    , pretty
+    , template-haskell
+  default-language: Haskell2010
 
 executable vl2c
-  main-is:              vl2c.hs
-  hs-source-dirs:       src
+  main-is: vl2c.hs
+  other-modules:
+      VL.Abstract.Analysis
+      VL.Abstract.Evaluator
+      VL.Abstract.Value
+      VL.Alacarte.Coproduct
+      VL.Alacarte.FixedPoint
+      VL.Compiler.C
+      VL.Compiler.CodeGenerator
+      VL.Compiler.Monad
+      VL.Compiler.ZEncoding
+      VL.Concrete.Evaluator
+      VL.Concrete.Value
+      VL.Language.Common
+      VL.Language.Desugar
+      VL.Language.Environment
+      VL.Language.Expression
+      VL.Language.Iso
+      VL.Language.Parser
+      VL.Language.Pretty
+      VL.Language.Read
+      VL.Language.Rename
+      VL.Language.Scalar
+      VL.Language.Syntax
+      VL.Language.Token
+      Paths_VL
+  hs-source-dirs:
+      src
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -Wall
   build-depends:
-    base, filepath, containers, mtl, pretty, template-haskell >= 2.5, parsec
-  ghc-options:          -O2 -Wall
-
-test-suite test-evaluator
-  type:                 exitcode-stdio-1.0
-  main-is:              test-evaluator.hs
-  hs-source-dirs:       test, src
-  build-depends:
-    base, containers, mtl, pretty, template-haskell >= 2.5, parsec,
-    HUnit, test-framework, test-framework-hunit
-  ghc-options:          -O2 -Wall
+      VL
+    , base >=4.7 && <5
+    , containers
+    , filepath
+    , mtl
+    , parsec
+    , pretty
+    , template-haskell
+  default-language: Haskell2010
 
 test-suite test-compiler
-  type:                 exitcode-stdio-1.0
-  main-is:              test-compiler.hs
-  hs-source-dirs:       test, src
+  type: exitcode-stdio-1.0
+  main-is: test-compiler.hs
+  other-modules:
+      Paths_VL
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
-    base, directory, process, filepath, mtl, Glob
+      Glob
+    , VL
+    , base >=4.7 && <5
+    , containers
+    , directory
+    , filepath
+    , mtl
+    , parsec
+    , pretty
+    , process
+    , template-haskell
+  default-language: Haskell2010
+
+test-suite test-evaluator
+  type: exitcode-stdio-1.0
+  main-is: test-evaluator.hs
+  other-modules:
+      Paths_VL
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
+  build-depends:
+      HUnit
+    , VL
+    , base >=4.7 && <5
+    , containers
+    , mtl
+    , parsec
+    , pretty
+    , template-haskell
+    , test-framework
+    , test-framework-hunit
+  default-language: Haskell2010

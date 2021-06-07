@@ -88,15 +88,15 @@ instance Pretty CExpr where
 
 instance Pretty CStat where
     pp (CReturn e)
-        = text "return" <+> pp e <> semi
+        = (text "return" <+> pp e) <> semi
     pp (CPrintf fmt args)
-        = text "printf" <> parens params <> semi
+        = (text "printf" <> parens params) <> semi
         where
           params = sep
                  . punctuate comma
                  $ doubleQuotes (text fmt) : map pp args
     pp (CLocalVarDecl typ var val)
-        = pp typ <+> text var <+> equals <+> pp val <> semi
+        = (pp typ <+> text var <+> equals <+> pp val) <> semi
 
 instance Pretty CDecl where
     pp (CInclude file)
@@ -109,18 +109,18 @@ instance Pretty CDecl where
                , rbrace <> semi
                ]
     pp (CGlobalVarDecl typ var val)
-        = pp typ <+> text var <+> equals <+> pp val <> semi
+        = (pp typ <+> text var <+> equals <+> pp val) <> semi
     pp (CStructDecl name slots _)
         = vcat [ text "typedef struct" <+> lbrace
                , nest 4 (col ppSlot slots)
-               , rbrace <+> text name <> semi
+               , (rbrace <+> text name) <> semi
                ]
         where
-          ppSlot (typ, var) = pp typ <+> text var <> semi
+          ppSlot (typ, var) = (pp typ <+> text var) <> semi
 
 instance Pretty CFunProto where
     pp (CFunProto ret_type fun_name formals)
-        = pp ret_type <+> text fun_name <> parens (row ppFormal formals)
+        = pp ret_type <+> (text fun_name <> parens (row ppFormal formals))
         where
           ppFormal (typ, var) = pp typ <+> text var
 

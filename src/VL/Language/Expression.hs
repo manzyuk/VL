@@ -22,19 +22,19 @@ type LetrecBinding = (Name, Name, CoreExpr)
 instance Pretty CoreExpr where
     pp (Var x) = text x
     pp (Lam formal body)
-	= parens $ hang (text "lambda" <+> parens (text formal)) 1 (pp body)
+        = parens $ hang (text "lambda" <+> parens (text formal)) 1 (pp body)
     pp (App operator operand)
-	= ppList [pp operator, pp operand]
+        = ppList [pp operator, pp operand]
     pp (Pair car cdr)
-	= ppList [text "cons", pp car, pp cdr]
+        = ppList [text "cons", pp car, pp cdr]
     pp (Letrec bindings body)
-	= ppList [ text "letrec"
-		 , parens . sepMap ppBinding $ bindings
-		 , pp body
-		 ]
-	where
-	  ppBinding (name, formal, expr)
-	      = parens $ hang (text name <+> parens (text formal)) 1 (pp expr)
+        = ppList [ text "letrec"
+                 , parens . sepMap ppBinding $ bindings
+                 , pp body
+                 ]
+        where
+          ppBinding (name, formal, expr)
+              = parens $ hang (text name <+> parens (text formal)) 1 (pp expr)
 
 ppClosure :: Pretty val => Environment val -> Name -> CoreExpr -> Doc
 ppClosure env x b = internal "closure" $ pp env $+$ pp (Lam x b)
@@ -53,7 +53,7 @@ variables (Letrec bindings body)
     where
       ns = Set.fromList [ name | (name, _, _)      <- bindings ]
       vs = Set.unions   [ Set.insert formal (variables expr)
-			       | (_, formal, expr) <- bindings ]
+                               | (_, formal, expr) <- bindings ]
 
 freeVariables :: CoreExpr -> Set Name
 freeVariables (Var x)
@@ -68,9 +68,9 @@ freeVariables (Letrec bindings body)
     = (freeVariables body `Set.union` vs) \\ ns
     where
       ns = Set.fromList [ name
-			| (name, _, _)      <- bindings ]
+                        | (name, _, _)      <- bindings ]
       vs = Set.unions   [ Set.delete formal (freeVariables expr)
-			| (_, formal, expr) <- bindings ]
+                        | (_, formal, expr) <- bindings ]
 
 -- The evaluation rule for `letrec' is based on the following
 -- trasformation from Reynolds's "Theories of Programming
@@ -86,4 +86,4 @@ pushLetrec bindings body = foldl App f fs
       vs = [ v | (v, _, _) <- bindings ]
       f  = foldr Lam body vs
       fs = [ Lam u (Letrec bindings e)
-	       | (_, u, e) <- bindings ]
+               | (_, u, e) <- bindings ]

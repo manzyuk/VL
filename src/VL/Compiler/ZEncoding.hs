@@ -3,7 +3,6 @@ module VL.Compiler.ZEncoding (zencode) where
 -- Z-encoding.  See http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/SymbolNames.
 
 import Data.Maybe
-import Data.Monoid
 
 import qualified Data.Map as Map
 
@@ -17,9 +16,11 @@ import Control.Arrow
 -- See http://book.realworldhaskell.org/read/data-structures.html#data.dlist
 newtype DList a = DL ([a] -> [a])
 
+instance Semigroup (DList a) where
+    DL f <> DL g = DL (f . g)
+
 instance Monoid (DList a) where
     mempty = DL id
-    mappend (DL f) (DL g) = DL (f . g)
 
 fromList :: [a] -> DList a
 fromList xs = DL (xs ++)

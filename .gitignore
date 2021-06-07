@@ -1,5 +1,5 @@
-*.hi
-*.o
-/dist
+.stack-work/
+*~
 /test/vl/*.c
 /test/vl/*.out
+/stack.yaml.lock

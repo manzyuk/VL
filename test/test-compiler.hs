@@ -30,18 +30,8 @@ run command arguments = do
         ]
       exitWith exitCode
 
-vl2c :: FilePath
-vl2c = "dist" </> "build" </> "vl2c" </> "vl2c"
-
 main :: IO ()
 main = do
-  -- Check if the executable 'vl2c' exists and fail if it doesn't.
-  vl2cExists <- doesFileExist vl2c
-  unless vl2cExists $ do
-    hPutStrLn stderr $
-      printf "Can't find %s. Try running 'cabal build'." vl2c
-    exitWith $ ExitFailure 1
-
   -- NB: 'glob' returns a list of _absolute_ paths.
   vlFiles <- glob "test/vl/*.vl"
 
@@ -51,7 +41,7 @@ main = do
         cFile   = name <.> "c"
         outFile = name <.> "out"
 
-    io $ run vl2c  [vlFile, cFile]
+    io $ run "stack" ["exec", "vl2c", vlFile, cFile]
 
     io $ run "gcc" [cFile, "-o", outFile]
 
